@@ -14,7 +14,8 @@ import JournalismHub from "pages/journalism-hub";
 import LoginScreen from "pages/login-screen";
 import RegistrationScreen from "pages/registration-screen";
 import AdminDashboard from "pages/admin-dashboard";
-import NotFound from "pages/NotFound";
+
+import NotFoundErrorPage from "pages/404-error-page";
 
 // Root Layout Component
 const RootLayout = () => {
@@ -67,7 +68,10 @@ const AppRoutes = () => {
           <Route path="registration-screen" element={<RegistrationScreen />} />
           <Route path="admin-dashboard" element={<AdminDashboard />} />
         </Route>
-        <Route path="*" element={<NotFound />} />
+        {/* New dedicated 404 error page route */}
+        <Route path="/404-error-page" element={<NotFoundErrorPage />} />
+        {/* Catch-all route now uses the enhanced 404 page */}
+        <Route path="*" element={<NotFoundErrorPage />} />
       </Routes>
     </BrowserRouter>
   );

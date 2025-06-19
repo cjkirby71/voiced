@@ -130,9 +130,9 @@ const PollingInterface = () => {
 
         {/* Category Filter Chips */}
         <FilterChips
-          categories={categories}
-          selectedCategory={selectedCategory}
-          onCategoryChange={setSelectedCategory}
+          options={categories}
+          selected={selectedCategory}
+          onSelect={setSelectedCategory}
         />
       </div>
 

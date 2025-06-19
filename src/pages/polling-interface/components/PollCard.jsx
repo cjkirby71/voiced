@@ -3,7 +3,7 @@ import Icon from 'components/AppIcon';
 import RepresentativeContactQuickAccess from 'components/ui/RepresentativeContactQuickAccess';
 
 const PollCard = ({ poll }) => {
-  const [selectedVote, setSelectedVote] = useState(poll.userVote || '');
+  const [selectedVote, setSelectedVote] = useState(poll?.userVote || '');
   const [whyText, setWhyText] = useState('');
   const [showWhyInput, setShowWhyInput] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -18,15 +18,15 @@ const PollCard = ({ poll }) => {
     setIsSubmitting(false);
     
     // Show success message or update UI
-    console.log('Vote submitted:', { pollId: poll.id, vote: selectedVote, reason: whyText });
+    console.log('Vote submitted:', { pollId: poll?.id, vote: selectedVote, reason: whyText });
   };
 
   const getStatusBadge = () => {
-    if (poll.status === 'active') {
+    if (poll?.status === 'active') {
       return (
         <div className="flex items-center space-x-1 px-2 py-1 bg-success-50 text-success-600 rounded-full text-xs font-medium">
           <Icon name="Clock" size={12} />
-          <span>{poll.timeRemaining} remaining</span>
+          <span>{poll?.timeRemaining || 'N/A'} remaining</span>
         </div>
       );
     } else {
@@ -49,6 +49,19 @@ const PollCard = ({ poll }) => {
     return colors[category] || 'bg-secondary-100 text-text-secondary';
   };
 
+  // Return null or loading state if poll is not available
+  if (!poll) {
+    return (
+      <div className="bg-surface border border-border rounded-lg p-6 civic-shadow">
+        <div className="animate-pulse">
+          <div className="h-4 bg-secondary-200 rounded w-3/4 mb-2"></div>
+          <div className="h-4 bg-secondary-200 rounded w-1/2 mb-4"></div>
+          <div className="h-20 bg-secondary-200 rounded mb-4"></div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <>
       <div className="bg-surface border border-border rounded-lg p-6 civic-shadow hover:civic-shadow-md civic-transition">
@@ -56,16 +69,16 @@ const PollCard = ({ poll }) => {
         <div className="flex items-start justify-between mb-4">
           <div className="flex-1">
             <div className="flex items-center space-x-2 mb-2">
-              <span className={`px-2 py-1 rounded-full text-xs font-medium ${getCategoryColor(poll.category)}`}>
-                {poll.category}
+              <span className={`px-2 py-1 rounded-full text-xs font-medium ${getCategoryColor(poll?.category)}`}>
+                {poll?.category || 'General'}
               </span>
               {getStatusBadge()}
             </div>
             <h3 className="text-lg font-heading font-semibold text-text-primary mb-2">
-              {poll.title}
+              {poll?.title || 'Poll Title Not Available'}
             </h3>
             <p className="text-sm text-text-muted mb-2">
-              {poll.billNumber} • Sponsored by {poll.sponsor}
+              {poll?.billNumber || 'N/A'} • Sponsored by {poll?.sponsor || 'Unknown'}
             </p>
           </div>
         </div>
@@ -73,10 +86,10 @@ const PollCard = ({ poll }) => {
         {/* Question */}
         <div className="mb-4">
           <p className="text-text-primary font-medium mb-3">
-            {poll.question}
+            {poll?.question || 'Question not available'}
           </p>
           <div className="text-sm text-text-secondary space-y-1">
-            <p>{poll.description}</p>
+            <p>{poll?.description || 'Description not available'}</p>
           </div>
         </div>
 
@@ -85,7 +98,7 @@ const PollCard = ({ poll }) => {
           <div className="flex items-center justify-between mb-2">
             <span className="text-sm font-medium text-text-primary">Current Results</span>
             <span className="text-sm text-text-secondary italic">
-              {poll.totalVotes.toLocaleString()} participants
+              {poll?.totalVotes?.toLocaleString() || '0'} participants
             </span>
           </div>
           <div className="space-y-2">
@@ -98,11 +111,11 @@ const PollCard = ({ poll }) => {
                 <div className="w-24 bg-secondary-200 rounded-full h-2">
                   <div 
                     className="bg-success h-2 rounded-full" 
-                    style={{ width: `${poll.results.yes}%` }}
+                    style={{ width: `${poll?.results?.yes || 0}%` }}
                   ></div>
                 </div>
                 <span className="text-sm font-medium text-text-primary italic">
-                  {poll.results.yes}%
+                  {poll?.results?.yes || 0}%
                 </span>
               </div>
             </div>
@@ -115,11 +128,11 @@ const PollCard = ({ poll }) => {
                 <div className="w-24 bg-secondary-200 rounded-full h-2">
                   <div 
                     className="bg-accent h-2 rounded-full" 
-                    style={{ width: `${poll.results.no}%` }}
+                    style={{ width: `${poll?.results?.no || 0}%` }}
                   ></div>
                 </div>
                 <span className="text-sm font-medium text-text-primary italic">
-                  {poll.results.no}%
+                  {poll?.results?.no || 0}%
                 </span>
               </div>
             </div>
@@ -132,11 +145,11 @@ const PollCard = ({ poll }) => {
                 <div className="w-24 bg-secondary-200 rounded-full h-2">
                   <div 
                     className="bg-warning h-2 rounded-full" 
-                    style={{ width: `${poll.results.maybe}%` }}
+                    style={{ width: `${poll?.results?.maybe || 0}%` }}
                   ></div>
                 </div>
                 <span className="text-sm font-medium text-text-primary italic">
-                  {poll.results.maybe}%
+                  {poll?.results?.maybe || 0}%
                 </span>
               </div>
             </div>
@@ -144,7 +157,7 @@ const PollCard = ({ poll }) => {
         </div>
 
         {/* Voting Interface */}
-        {poll.status === 'active' && (
+        {poll?.status === 'active' && (
           <div className="space-y-4 mb-6">
             <div>
               <label className="block text-sm font-medium text-text-primary mb-2">
@@ -184,7 +197,7 @@ const PollCard = ({ poll }) => {
                     />
                     <div className="flex justify-between text-xs text-text-muted mt-1">
                       <span>Your reasoning helps inform other citizens</span>
-                      <span>{whyText.length}/500</span>
+                      <span>{whyText?.length || 0}/500</span>
                     </div>
                   </div>
                 )}
@@ -212,7 +225,7 @@ const PollCard = ({ poll }) => {
         )}
 
         {/* Completed Poll Results */}
-        {poll.status === 'completed' && (
+        {poll?.status === 'completed' && (
           <div className="mb-6 p-4 bg-secondary-50 rounded-lg">
             <div className="flex items-center space-x-2 mb-2">
               <Icon name="BarChart3" size={16} className="text-text-secondary" />
@@ -221,11 +234,11 @@ const PollCard = ({ poll }) => {
             <p className="text-sm text-text-secondary italic">
               Results coming soon - Analysis in progress
             </p>
-            {poll.userVote && (
+            {poll?.userVote && (
               <div className="mt-2 flex items-center space-x-2">
                 <Icon name="CheckCircle" size={14} className="text-success" />
                 <span className="text-xs text-text-secondary">
-                  You voted: <span className="font-medium capitalize">{poll.userVote}</span>
+                  You voted: <span className="font-medium capitalize">{poll?.userVote}</span>
                 </span>
               </div>
             )}
@@ -253,7 +266,7 @@ const PollCard = ({ poll }) => {
         isOpen={showContactRep}
         onClose={() => setShowContactRep(false)}
         contentContext={{
-          title: poll.title,
+          title: poll?.title || 'Poll',
           type: 'poll',
           userPosition: selectedVote
         }}
