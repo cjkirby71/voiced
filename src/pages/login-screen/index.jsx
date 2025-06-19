@@ -1,43 +1,51 @@
 // src/pages/login-screen/index.jsx
-import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import Icon from 'components/AppIcon';
 import LoginForm from './components/LoginForm';
 import SocialAuthButtons from './components/SocialAuthButtons';
+import useAuth from '../../hooks/useAuth';
 
 const LoginScreen = () => {
-  const navigate = useNavigate();
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState('');
+  const { loginWithRedirect, error, isLoading, requireGuest, clearError } = useAuth();
+  const [localError, setLocalError] = useState('');
 
-  const handleLogin = (credentials) => {
-    setIsLoading(true);
-    setError('');
+  // Redirect if already authenticated
+  useEffect(() => {
+    requireGuest();
+  }, []);
+
+  // Clear errors when component mounts
+  useEffect(() => {
+    clearError();
+    setLocalError('');
+  }, [clearError]);
+
+  const handleLogin = async (credentials) => {
+    setLocalError('');
     
-    // Simulate API call
-    setTimeout(() => {
-      // Mock validation
-      if (credentials.email === 'demo@voiced.gov' && credentials.password === 'demo123') {
-        setIsLoading(false);
-        navigate('/home-dashboard');
-      } else {
-        setError('Invalid email or password. Please try again.');
-        setIsLoading(false);
-      }
-    }, 1500);
+    const result = await loginWithRedirect(credentials);
+    if (!result.success) {
+      setLocalError(result.error || 'Login failed. Please try again.');
+    }
   };
 
-  const handleSocialAuth = (provider) => {
-    setIsLoading(true);
-    setError('');
+  const handleSocialAuth = async (provider) => {
+    setLocalError('');
     
-    // Simulate social auth
-    setTimeout(() => {
-      console.log(`Authenticating with ${provider}`);
-      setIsLoading(false);
-      navigate('/home-dashboard');
-    }, 2000);
+    // Mock social auth - replace with actual implementation
+    const mockCredentials = {
+      email: 'demo@voiced.gov',
+      password: 'demo123'
+    };
+    
+    const result = await loginWithRedirect(mockCredentials);
+    if (!result.success) {
+      setLocalError('Social authentication failed. Please try again.');
+    }
   };
+
+  const displayError = error || localError;
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center px-4 sm:px-6 lg:px-8">
@@ -70,18 +78,20 @@ const LoginScreen = () => {
         {/* Login Card */}
         <div className="bg-surface rounded-xl shadow-civic-lg border border-border p-8">
           {/* Error Message */}
-          {error && (
+          {displayError && (
             <div className="mb-6 p-4 bg-error-50 border border-error-100 rounded-lg flex items-center space-x-3">
               <Icon name="AlertCircle" size={20} className="text-error-600" />
-              <span className="text-error-600 text-sm">{error}</span>
+              <span className="text-error-600 text-sm">{displayError}</span>
             </div>
           )}
 
           {/* Demo Credentials Notice */}
           <div className="mb-6 p-4 bg-primary-50 border border-primary-100 rounded-lg">
-            <p className="text-primary-700 text-sm font-medium mb-1">Demo Credentials:</p>
-            <p className="text-primary-600 text-xs">Email: demo@voiced.gov</p>
-            <p className="text-primary-600 text-xs">Password: demo123</p>
+            <p className="text-primary-700 text-sm font-medium mb-2">Demo Credentials:</p>
+            <div className="space-y-1">
+              <p className="text-primary-600 text-xs"><strong>Admin:</strong> demo@voiced.gov / demo123</p>
+              <p className="text-primary-600 text-xs"><strong>User:</strong> user@voiced.gov / user123</p>
+            </div>
           </div>
 
           {/* Login Form */}

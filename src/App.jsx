@@ -1,9 +1,13 @@
+// src/App.jsx
 import React from "react";
 import Routes from "./Routes";
+import AppProvider from './context';
 
 function App() {
   return (
-    <Routes />
+    <AppProvider>
+      <Routes />
+    </AppProvider>
   );
 }
 

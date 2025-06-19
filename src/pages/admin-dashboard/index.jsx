@@ -2,6 +2,8 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import Icon from 'components/AppIcon';
+import useAuth from '../../hooks/useAuth';
+import { usePoll } from '../../context/PollContext';
 
 import UserManagement from './components/UserManagement';
 import ContentModeration from './components/ContentModeration';
@@ -11,15 +13,21 @@ import SystemSettings from './components/SystemSettings';
 import DashboardMetrics from './components/DashboardMetrics';
 
 const AdminDashboard = () => {
+  const { user, requireRole } = useAuth();
+  const { pollStats, getActivePollsCount } = usePoll();
   const [activeSection, setActiveSection] = useState('overview');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [adminRole, setAdminRole] = useState('system_admin'); // system_admin, content_moderator, user_admin
   const [realTimeMetrics, setRealTimeMetrics] = useState({
     activeUsers: 0,
     pollParticipation: 0,
     subscriptionConversions: 0,
     contentEngagement: 0
   });
+
+  // Check if user has admin access
+  useEffect(() => {
+    requireRole('admin');
+  }, [requireRole]);
 
   // Mock real-time data updates
   useEffect(() => {
@@ -74,14 +82,24 @@ const AdminDashboard = () => {
     }
   ];
 
+  // Use actual user role, defaulting to system_admin for admin users
+  const adminRole = user?.role === 'admin' ? 'system_admin' : user?.role || 'system_admin';
+  
   const filteredSidebarItems = sidebarItems.filter(item => 
     item?.roles?.includes(adminRole)
   );
 
   const renderActiveSection = () => {
+    const combinedMetrics = {
+      ...realTimeMetrics,
+      totalPolls: pollStats?.totalPolls || 0,
+      activePolls: getActivePollsCount(),
+      totalVotes: pollStats?.totalVotes || 0
+    };
+
     switch (activeSection) {
       case 'overview':
-        return <DashboardMetrics metrics={realTimeMetrics} />;
+        return <DashboardMetrics metrics={combinedMetrics} />;
       case 'users':
         return <UserManagement adminRole={adminRole} />;
       case 'content':
@@ -93,7 +111,7 @@ const AdminDashboard = () => {
       case 'settings':
         return <SystemSettings />;
       default:
-        return <DashboardMetrics metrics={realTimeMetrics} />;
+        return <DashboardMetrics metrics={combinedMetrics} />;
     }
   };
 
@@ -107,7 +125,8 @@ const AdminDashboard = () => {
             {!sidebarCollapsed && (
               <div>
                 <h2 className="text-lg font-heading font-bold text-text-primary">Admin Panel</h2>
-                <p className="text-xs text-text-secondary capitalize">{adminRole?.replace('_', ' ')}</p>
+                <p className="text-xs text-text-secondary capitalize">{user?.name}</p>
+                <p className="text-xs text-text-muted">{adminRole?.replace('_', ' ')}</p>
               </div>
             )}
             <button
@@ -174,6 +193,10 @@ const AdminDashboard = () => {
               <div className="text-sm">
                 <span className="text-text-secondary">Active Users: </span>
                 <span className="font-bold text-text-primary">{realTimeMetrics?.activeUsers?.toLocaleString()}</span>
+              </div>
+              <div className="text-sm">
+                <span className="text-text-secondary">Active Polls: </span>
+                <span className="font-bold text-text-primary">{getActivePollsCount()}</span>
               </div>
               <div className="text-sm">
                 <span className="text-text-secondary">Poll Participation: </span>

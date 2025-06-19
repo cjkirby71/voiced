@@ -1,6 +1,6 @@
 // src/Routes.jsx
 import React from "react";
-import { BrowserRouter, Routes as RouterRoutes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Outlet } from "react-router-dom";
 import ScrollToTop from "components/ScrollToTop";
 import ErrorBoundary from "components/ErrorBoundary";
 import Header from "components/ui/Header";
@@ -16,33 +16,61 @@ import RegistrationScreen from "pages/registration-screen";
 import AdminDashboard from "pages/admin-dashboard";
 import NotFound from "pages/NotFound";
 
-const Routes = () => {
+// Root Layout Component
+const RootLayout = () => {
+  return (
+    <ErrorBoundary>
+      <ScrollToTop />
+      <div className="min-h-screen bg-background">
+        <Header />
+        <GlobalSearchFilter />
+        <main className="pt-16">
+          <Outlet />
+        </main>
+      </div>
+    </ErrorBoundary>
+  );
+};
+
+// Error Boundary for Route-specific errors
+const RouteErrorBoundary = ({ error }) => {
+  console.error('Route Error:', error);
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-background">
+      <div className="text-center">
+        <h1 className="text-2xl font-bold text-text-primary mb-4">Something went wrong</h1>
+        <p className="text-text-secondary mb-6">We're sorry, but something unexpected happened.</p>
+        <button 
+          onClick={() => window.location.reload()}
+          className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-600 transition-colors duration-200"
+        >
+          Reload Page
+        </button>
+      </div>
+    </div>
+  );
+};
+
+const AppRoutes = () => {
   return (
     <BrowserRouter>
-      <ErrorBoundary>
-        <ScrollToTop />
-        <div className="min-h-screen bg-background">
-          <Header />
-          <GlobalSearchFilter />
-          <main className="pt-16">
-            <RouterRoutes>
-              <Route path="/" element={<HomeDashboard />} />
-              <Route path="/home-dashboard" element={<HomeDashboard />} />
-              <Route path="/polling-interface" element={<PollingInterface />} />
-              <Route path="/subscription-management" element={<SubscriptionManagement />} />
-              <Route path="/user-profile-representative-contact" element={<UserProfileRepresentativeContact />} />
-              <Route path="/community-feedback-hub" element={<CommunityFeedbackHub />} />
-              <Route path="/journalism-hub" element={<JournalismHub />} />
-              <Route path="/login-screen" element={<LoginScreen />} />
-              <Route path="/registration-screen" element={<RegistrationScreen />} />
-              <Route path="/admin-dashboard" element={<AdminDashboard />} />
-              <Route path="*" element={<NotFound />} />
-            </RouterRoutes>
-          </main>
-        </div>
-      </ErrorBoundary>
+      <Routes>
+        <Route path="/" element={<RootLayout />}>
+          <Route index element={<HomeDashboard />} />
+          <Route path="home-dashboard" element={<HomeDashboard />} />
+          <Route path="polling-interface" element={<PollingInterface />} />
+          <Route path="subscription-management" element={<SubscriptionManagement />} />
+          <Route path="user-profile-representative-contact" element={<UserProfileRepresentativeContact />} />
+          <Route path="community-feedback-hub" element={<CommunityFeedbackHub />} />
+          <Route path="journalism-hub" element={<JournalismHub />} />
+          <Route path="login-screen" element={<LoginScreen />} />
+          <Route path="registration-screen" element={<RegistrationScreen />} />
+          <Route path="admin-dashboard" element={<AdminDashboard />} />
+        </Route>
+        <Route path="*" element={<NotFound />} />
+      </Routes>
     </BrowserRouter>
   );
 };
 
-export default Routes;
+export default AppRoutes;
