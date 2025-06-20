@@ -1,7 +1,7 @@
 // src/components/RouteTransition.jsx
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { useNavigation } from 'react-router-dom';
+import { useLocation } from 'react-router-dom';
 import Icon from './AppIcon';
 
 /**
@@ -9,8 +9,41 @@ import Icon from './AppIcon';
  * Provides smooth transitions between routes with loading indicators
  */
 const RouteTransition = ({ children }) => {
-  const navigation = useNavigation();
-  const isLoading = navigation.state === 'loading';
+  const location = useLocation();
+  const [isLoading, setIsLoading] = useState(false);
+  const [displayLocation, setDisplayLocation] = useState(location);
+
+  useEffect(() => {
+    // Check if location exists and has pathname
+    if (!location || !location.pathname) {
+      return;
+    }
+
+    // Check if this is actually a route change
+    if (displayLocation && location.pathname === displayLocation.pathname) {
+      return;
+    }
+
+    // Start loading transition
+    setIsLoading(true);
+    
+    // Simulate route loading time
+    const timer = setTimeout(() => {
+      setDisplayLocation(location);
+      setIsLoading(false);
+    }, 300);
+
+    return () => {
+      clearTimeout(timer);
+    };
+  }, [location, displayLocation]);
+
+  // Handle initial render when displayLocation is not set
+  useEffect(() => {
+    if (!displayLocation && location) {
+      setDisplayLocation(location);
+    }
+  }, [location, displayLocation]);
 
   return (
     <div className="relative">
@@ -33,7 +66,7 @@ const RouteTransition = ({ children }) => {
 
       {/* Page Content with Transition */}
       <motion.div
-        key={navigation.location?.pathname || 'default'}
+        key={displayLocation?.pathname || 'default'}
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         exit={{ opacity: 0, y: -20 }}

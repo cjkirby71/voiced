@@ -1,15 +1,15 @@
 // src/pages/registration-screen/components/RegistrationForm.jsx
 import React, { useState } from 'react';
 import Icon from 'components/AppIcon';
+import { useAuth } from '../../../context/AuthContext';
 
 const RegistrationForm = ({ 
-  onSubmit, 
-  isLoading, 
   currentStep, 
   setCurrentStep, 
   onShowTerms, 
   onShowPrivacy 
 }) => {
+  const { signUp, authError, clearError } = useAuth();
   const [formData, setFormData] = useState({
     fullName: '',
     email: '',
@@ -26,6 +26,7 @@ const RegistrationForm = ({
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [passwordStrength, setPasswordStrength] = useState(0);
+  const [isLoading, setIsLoading] = useState(false);
 
   const calculatePasswordStrength = (password) => {
     let strength = 0;
@@ -121,6 +122,11 @@ const RegistrationForm = ({
     if (errors[field]) {
       setErrors(prev => ({ ...prev, [field]: '' }));
     }
+    
+    // Clear auth error when user starts typing
+    if (authError) {
+      clearError();
+    }
   };
 
   const handleNext = () => {
@@ -134,13 +140,39 @@ const RegistrationForm = ({
     setErrors({});
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     
     if (currentStep === 1) {
       handleNext();
-    } else if (validateStep2()) {
-      onSubmit(formData);
+      return;
+    }
+
+    if (!validateStep2()) {
+      return;
+    }
+
+    setIsLoading(true);
+    clearError();
+
+    try {
+      const result = await signUp(formData.email, formData.password, {
+        fullName: formData.fullName,
+        zipCode: formData.zipCode,
+        phoneNumber: formData.phoneNumber,
+        smsNotifications: formData.smsNotifications,
+        emailNotifications: formData.emailNotifications,
+        tier: 'free' // Default tier for new users
+      });
+
+      if (result.success) {
+        // Redirect will be handled by auth state change or show confirmation
+        console.log('Registration successful');
+      }
+    } catch (error) {
+      console.log('Registration error:', error);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -148,6 +180,16 @@ const RegistrationForm = ({
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
+      {/* Display auth error */}
+      {authError && (
+        <div className="p-4 bg-error-50 border border-error-200 rounded-lg">
+          <p className="text-sm text-error-700 flex items-center space-x-2">
+            <Icon name="AlertCircle" size={16} />
+            <span>{authError}</span>
+          </p>
+        </div>
+      )}
+
       {currentStep === 1 && (
         <>
           {/* Full Name */}

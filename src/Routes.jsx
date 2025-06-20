@@ -3,6 +3,7 @@ import React from "react";
 import { BrowserRouter, Routes, Route, Outlet } from "react-router-dom";
 import ScrollToTop from "components/ScrollToTop";
 import ErrorBoundary from "components/ErrorBoundary";
+import RouteTransition from "components/RouteTransition";
 import Header from "components/ui/Header";
 import GlobalSearchFilter from "components/ui/GlobalSearchFilter";
 import useGoogleAnalytics from 'hooks/useGoogleAnalytics';
@@ -15,6 +16,7 @@ import JournalismHub from "pages/journalism-hub";
 import LoginScreen from "pages/login-screen";
 import RegistrationScreen from "pages/registration-screen";
 import AdminDashboard from "pages/admin-dashboard";
+import AuthenticationSetupGuide from "pages/authentication-setup-guide";
 
 import NotFoundErrorPage from "pages/404-error-page";
 
@@ -30,7 +32,9 @@ const RootLayout = () => {
         <Header />
         <GlobalSearchFilter />
         <main className="pt-16">
-          <Outlet />
+          <RouteTransition>
+            <Outlet />
+          </RouteTransition>
         </main>
       </div>
     </ErrorBoundary>
@@ -71,6 +75,7 @@ const AppRoutes = () => {
           <Route path="login-screen" element={<LoginScreen />} />
           <Route path="registration-screen" element={<RegistrationScreen />} />
           <Route path="admin-dashboard" element={<AdminDashboard />} />
+          <Route path="authentication-setup-guide" element={<AuthenticationSetupGuide />} />
         </Route>
         {/* New dedicated 404 error page route */}
         <Route path="/404-error-page" element={<NotFoundErrorPage />} />
