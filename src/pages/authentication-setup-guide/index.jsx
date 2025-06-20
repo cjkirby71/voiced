@@ -410,8 +410,8 @@ function TieredContent() {
                         </p>
                         <CodeBlock 
                           code={`// Protected Route Component\nimport { useAuth } from '../context/AuthContext'
-;\nimport { Navigate } from 'react-router-dom'
-import Icon from '../../components/AppIcon';
+;\nimport { Navigate } from 'react-router-dom';
+ import Icon from'../../components/AppIcon';
 
 ;\n\nfunction ProtectedRoute({ children, requireTier = null }) {\n  const { user, userProfile, loading } = useAuth();\n\n  if (loading) return <div>Loading...</div>;\n  \n  if (!user) {\n    return <Navigate to="/login" replace />;\n  }\n  \n  if (requireTier && userProfile?.tier !== requireTier) {\n    return <Navigate to="/upgrade" replace />;\n  }\n\n  return children;\n}\n\n// Usage in Routes\n<Route path="/dashboard" element={\n  <ProtectedRoute>\n    <Dashboard />\n  </ProtectedRoute>\n} />\n\n<Route path="/national-content" element={\n  <ProtectedRoute requireTier="national">\n    <NationalContent />\n  </ProtectedRoute>\n} />`} 
                           language="javascript" 
