@@ -10,13 +10,25 @@ if (!supabaseUrl || !supabaseAnonKey) {
   throw new Error('Missing Supabase environment variables');
 }
 
-// Create Supabase client
+// Create Supabase client with enhanced error handling
 const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
     autoRefreshToken: true,
     persistSession: true,
     detectSessionInUrl: true,
-    flowType: 'pkce'
+    flowType: 'pkce',
+    // Enhanced error handling for refresh token issues
+    onRefreshTokenError: (error) => {
+      debugLogger.error('Refresh token error detected:', error);
+      
+      // Clear auth storage on refresh token errors
+      try {
+        localStorage.removeItem(`sb-${supabaseUrl.split('//')[1].split('.')[0]}-auth-token`);
+        sessionStorage.clear();
+      } catch (storageError) {
+        debugLogger.error('Error clearing storage after refresh token error:', storageError);
+      }
+    }
   }
 });
 
@@ -24,66 +36,105 @@ const supabase = createClient(supabaseUrl, supabaseAnonKey, {
 export const authHelpers = {
   // Sign up with email/password
   async signUp(email, password, metadata = {}) {
-    const { data, error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: metadata,
-        emailRedirectTo: `${window.location.origin}/auth/callback`
+    try {
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: metadata,
+          emailRedirectTo: `${window.location.origin}/auth/callback`
+        }
+      });
+      
+      debugLogger.info('SignUp attempt', { email, hasMetadata: !!Object.keys(metadata).length });
+      
+      if (error) {
+        debugLogger.error('SignUp failed', error);
+        
+        // Handle refresh token errors during signup
+        if (error.message?.toLowerCase()?.includes('refresh token')) {
+          debugLogger.warn('Refresh token error during signup, clearing auth state');
+          await supabase.auth.signOut({ scope: 'local' });
+        }
+      } else {
+        debugLogger.info('SignUp successful', { userId: data?.user?.id, needsConfirmation: !data?.session });
       }
-    });
-    
-    debugLogger.info('SignUp attempt', { email, hasMetadata: !!Object.keys(metadata).length });
-    
-    if (error) {
-      debugLogger.error('SignUp failed', error);
-    } else {
-      debugLogger.info('SignUp successful', { userId: data?.user?.id, needsConfirmation: !data?.session });
+      
+      return { data, error };
+    } catch (exception) {
+      debugLogger.error('SignUp exception:', exception);
+      return { data: null, error: exception };
     }
-    
-    return { data, error };
   },
 
   // Sign in with email/password
   async signIn(email, password) {
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password
-    });
-    
-    debugLogger.info('SignIn attempt', { email });
-    
-    if (error) {
-      debugLogger.error('SignIn failed', error);
-    } else {
-      debugLogger.info('SignIn successful', { userId: data?.user?.id });
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password
+      });
+      
+      debugLogger.info('SignIn attempt', { email });
+      
+      if (error) {
+        debugLogger.error('SignIn failed', error);
+        
+        // Handle refresh token errors during signin
+        if (error.message?.toLowerCase()?.includes('refresh token')) {
+          debugLogger.warn('Refresh token error during signin, clearing auth state');
+          await supabase.auth.signOut({ scope: 'local' });
+        }
+      } else {
+        debugLogger.info('SignIn successful', { userId: data?.user?.id });
+      }
+      
+      return { data, error };
+    } catch (exception) {
+      debugLogger.error('SignIn exception:', exception);
+      return { data: null, error: exception };
     }
-    
-    return { data, error };
   },
 
   // Sign out
   async signOut() {
-    const { error } = await supabase.auth.signOut();
-    
-    if (error) {
-      debugLogger.error('SignOut failed', error);
-    } else {
-      debugLogger.info('SignOut successful');
+    try {
+      const { error } = await supabase.auth.signOut();
+      
+      if (error) {
+        debugLogger.error('SignOut failed', error);
+      } else {
+        debugLogger.info('SignOut successful');
+      }
+      
+      return { error };
+    } catch (exception) {
+      debugLogger.error('SignOut exception:', exception);
+      return { error: exception };
     }
-    
-    return { error };
   },
 
-  // Get current session
+  // Get current session with refresh token error handling
   async getCurrentSession() {
-    const { data, error } = await supabase.auth.getSession();
-    
-    if (error) {
-      debugLogger.error('GetSession failed', error);
+    try {
+      const { data, error } = await supabase.auth.getSession();
+      
+      if (error) {
+        debugLogger.error('GetSession failed', error);
+        
+        // Handle refresh token errors
+        if (error.message?.toLowerCase()?.includes('refresh token')) {
+          debugLogger.warn('Refresh token error during getSession, clearing auth state');
+          await supabase.auth.signOut({ scope: 'local' });
+          return { data: { session: null, user: null }, error };
+        }
+      }
+      
+      return { data, error };
+    } catch (exception) {
+      debugLogger.error('GetSession exception:', exception);
+      return { data: { session: null, user: null }, error: exception };
     }
-    
-    return { data, error };
   },
 
   // Reset password
@@ -141,7 +192,7 @@ export const authHelpers = {
     }
   },
 
-  // Refresh JWT token using edge function
+  // Refresh JWT token using edge function with enhanced error handling
   async refreshJWTToken(customClaims = {}) {
     try {
       const { data, error } = await supabase.functions.invoke('jwt-exchange', {
@@ -153,14 +204,28 @@ export const authHelpers = {
 
       if (error) {
         debugLogger.error('JWT refresh failed', error);
+        
+        // Handle refresh token errors specifically
+        if (error.message?.toLowerCase()?.includes('refresh token')) {
+          debugLogger.warn('Refresh token error during JWT refresh, clearing auth state');
+          await supabase.auth.signOut({ scope: 'local' });
+        }
+        
         return { data: null, error };
       }
 
       debugLogger.info('JWT refresh successful');
       return { data, error: null };
-    } catch (error) {
-      debugLogger.error('JWT refresh exception', error);
-      return { data: null, error };
+    } catch (exception) {
+      debugLogger.error('JWT refresh exception', exception);
+      
+      // Handle refresh token errors in exceptions
+      if (exception.message?.toLowerCase()?.includes('refresh token')) {
+        debugLogger.warn('Refresh token error exception during JWT refresh, clearing auth state');
+        await supabase.auth.signOut({ scope: 'local' });
+      }
+      
+      return { data: null, error: exception };
     }
   },
 

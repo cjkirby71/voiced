@@ -9,6 +9,7 @@ export const ERROR_TYPES = {
   NETWORK: 'network',
   AUTH: 'authentication',
   JWT: 'jwt_token',
+  REFRESH_TOKEN: 'refresh_token',
   DATABASE: 'database',
   PERMISSION: 'permission',
   VALIDATION: 'validation',
@@ -23,6 +24,14 @@ export const categorizeError = (error) => {
   // Network errors
   if (errorMessage.includes('network') || errorMessage.includes('fetch') || errorMessage.includes('connection')) {
     return ERROR_TYPES.NETWORK;
+  }
+  
+  // Refresh token specific errors
+  if (errorMessage.includes('refresh token not found') || 
+      errorMessage.includes('invalid refresh token') ||
+      errorMessage.includes('refresh_token_not_found') ||
+      errorMessage.includes('invalid_refresh_token')) {
+    return ERROR_TYPES.REFRESH_TOKEN;
   }
   
   // Authentication errors
@@ -74,6 +83,18 @@ export const errorRecoveryStrategies = {
       'Redirect to login page',
       'Show authentication error message',
       'Suggest password reset if applicable'
+    ],
+    autoRetry: false,
+    maxRetries: 0
+  },
+  
+  [ERROR_TYPES.REFRESH_TOKEN]: {
+    name: 'Refresh Token Error Recovery',
+    steps: [
+      'Clear invalid refresh token from storage',
+      'Clear all auth-related localStorage/sessionStorage',
+      'Reset authentication state',
+      'Redirect to login with appropriate message'
     ],
     autoRetry: false,
     maxRetries: 0
@@ -195,6 +216,8 @@ class ErrorRecoveryManager {
       switch (errorType) {
         case ERROR_TYPES.NETWORK:
           return await this.recoverNetworkError(error, context);
+        case ERROR_TYPES.REFRESH_TOKEN:
+          return await this.recoverRefreshTokenError(error, context);
         case ERROR_TYPES.JWT:
           return await this.recoverJWTError(error, context);
         case ERROR_TYPES.DATABASE:
@@ -223,6 +246,67 @@ class ErrorRecoveryManager {
     }
     
     return { recovered: false, error: 'Network retry function not provided' };
+  }
+  
+  // Refresh token error recovery
+  async recoverRefreshTokenError(error, context) {
+    debugLogger.info('Attempting refresh token error recovery');
+    
+    try {
+      // Clear all authentication data from storage
+      this.clearAuthStorage();
+      
+      // Reset Supabase auth state
+      await supabase.auth.signOut({ scope: 'local' });
+      
+      debugLogger.info('Authentication state cleared due to refresh token error');
+      
+      return {
+        recovered: false,
+        requiresReauth: true,
+        clearAuth: true,
+        userMessage: 'Your session has expired. Please sign in again to continue.',
+        redirectTo: '/login-screen'
+      };
+    } catch (recoveryError) {
+      debugLogger.error('Refresh token recovery exception:', recoveryError);
+      return {
+        recovered: false,
+        requiresReauth: true,
+        clearAuth: true,
+        userMessage: 'Authentication error. Please sign in again.',
+        redirectTo: '/login-screen'
+      };
+    }
+  }
+  
+  // Clear authentication storage
+  clearAuthStorage() {
+    try {
+      // Clear localStorage items
+      const keysToRemove = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key?.includes('supabase') || key?.includes('auth') || key?.includes('jwt')) {
+          keysToRemove.push(key);
+        }
+      }
+      keysToRemove.forEach(key => localStorage.removeItem(key));
+      
+      // Clear sessionStorage items
+      const sessionKeysToRemove = [];
+      for (let i = 0; i < sessionStorage.length; i++) {
+        const key = sessionStorage.key(i);
+        if (key?.includes('supabase') || key?.includes('auth') || key?.includes('jwt')) {
+          sessionKeysToRemove.push(key);
+        }
+      }
+      sessionKeysToRemove.forEach(key => sessionStorage.removeItem(key));
+      
+      debugLogger.info('Auth storage cleared successfully');
+    } catch (error) {
+      debugLogger.error('Error clearing auth storage:', error);
+    }
   }
   
   // JWT error recovery
@@ -308,6 +392,8 @@ class ErrorRecoveryManager {
         return 'Unable to connect to the server. Please check your internet connection and try again.';
       case ERROR_TYPES.AUTH:
         return 'Your session has expired. Please sign in again to continue.';
+      case ERROR_TYPES.REFRESH_TOKEN:
+        return 'Your session has expired and cannot be refreshed. Please sign in again to continue.';
       case ERROR_TYPES.JWT:
         return 'Authentication token expired. Please refresh the page or sign in again.';
       case ERROR_TYPES.DATABASE:

@@ -1,571 +1,511 @@
 // src/context/AuthContext.jsx
-import React, { createContext, useContext, useEffect, useState } from "react";
-import { useNavigate, useLocation } from "react-router-dom";
-import authService from "../utils/authService";
+import React, { createContext, useContext, useReducer, useEffect, useState } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 
+// Initial state
+const initialState = {
+  user: null,
+  session: null,
+  isAuthenticated: false,
+  isLoading: false,
+  error: null,
+  authMethod: null, // 'email', 'magic_link', 'oauth'
+  loginAttempts: 0,
+  lastLoginTime: null,
+  authCallbackData: null
+};
+
+// Action types
+const AUTH_ACTIONS = {
+  AUTH_START: 'AUTH_START',
+  AUTH_SUCCESS: 'AUTH_SUCCESS',
+  AUTH_FAILURE: 'AUTH_FAILURE',
+  LOGOUT: 'LOGOUT',
+  RESTORE_SESSION: 'RESTORE_SESSION',
+  CLEAR_ERROR: 'CLEAR_ERROR',
+  SET_CALLBACK_DATA: 'SET_CALLBACK_DATA',
+  CLEAR_CALLBACK_DATA: 'CLEAR_CALLBACK_DATA'
+};
+
+// Reducer function
+const authReducer = (state, action) => {
+  switch (action.type) {
+    case AUTH_ACTIONS.AUTH_START:
+      return {
+        ...state,
+        isLoading: true,
+        error: null
+      };
+    
+    case AUTH_ACTIONS.AUTH_SUCCESS:
+      return {
+        ...state,
+        user: action.payload.user,
+        session: action.payload.session,
+        isAuthenticated: true,
+        isLoading: false,
+        error: null,
+        authMethod: action.payload.method || null,
+        loginAttempts: 0,
+        lastLoginTime: new Date().toISOString()
+      };
+    
+    case AUTH_ACTIONS.AUTH_FAILURE:
+      return {
+        ...state,
+        isLoading: false,
+        error: action.payload.error,
+        loginAttempts: state.loginAttempts + 1,
+        isAuthenticated: false,
+        user: null,
+        session: null
+      };
+    
+    case AUTH_ACTIONS.LOGOUT:
+      return {
+        ...initialState
+      };
+    
+    case AUTH_ACTIONS.RESTORE_SESSION:
+      return {
+        ...state,
+        ...action.payload,
+        isLoading: false
+      };
+    
+    case AUTH_ACTIONS.CLEAR_ERROR:
+      return {
+        ...state,
+        error: null
+      };
+    
+    case AUTH_ACTIONS.SET_CALLBACK_DATA:
+      return {
+        ...state,
+        authCallbackData: action.payload
+      };
+    
+    case AUTH_ACTIONS.CLEAR_CALLBACK_DATA:
+      return {
+        ...state,
+        authCallbackData: null
+      };
+    
+    default:
+      return state;
+  }
+};
+
+// Create context
 const AuthContext = createContext();
 
-// AuthCallback component to handle authentication redirects
-export function AuthCallback() {
-  const [status, setStatus] = useState('processing');
-  const [error, setError] = useState(null);
-  const navigate = useNavigate();
-  const location = useLocation();
+// Provider component
+export const AuthProvider = ({ children }) => {
+  const [state, dispatch] = useReducer(authReducer, initialState);
 
+  // Restore session on app load
   useEffect(() => {
-    let isMounted = true;
-
-    const handleAuthCallback = async () => {
+    const restoreSession = () => {
       try {
-        console.log('AuthCallback: Starting callback processing');
-        console.log('AuthCallback: Current URL:', window.location.href);
-        console.log('AuthCallback: Search params:', location.search);
+        const savedUser = localStorage.getItem('voiced_auth_user');
+        const savedSession = localStorage.getItem('voiced_auth_session');
+        const savedAuth = localStorage.getItem('voiced_auth_status');
         
-        const urlParams = new URLSearchParams(location.search);
-        const code = urlParams.get('code');
-        const error = urlParams.get('error');
-        const errorCode = urlParams.get('error_code');
-        const errorDescription = urlParams.get('error_description');
-
-        console.log('AuthCallback: Extracted params:', {
-          hasCode: !!code,
-          hasError: !!error,
-          errorCode,
-          errorDescription
-        });
-
-        // Handle error cases first
-        if (error) {
-          let userMessage = 'Authentication failed. Please try again.';
+        if (savedUser && savedSession && savedAuth === 'authenticated') {
+          const user = JSON.parse(savedUser);
+          const session = JSON.parse(savedSession);
           
-          if (errorCode === 'otp_expired' || error === 'access_denied') {
-            userMessage = 'Your verification link has expired. Please sign up again to receive a new link.';
-          } else if (errorDescription) {
-            userMessage = decodeURIComponent(errorDescription.replace(/\+/g, ' '));
-          }
+          // Check if session is still valid (basic check)
+          const sessionExpiry = new Date(session?.expires_at || 0);
+          const now = new Date();
           
-          console.log('AuthCallback: Error detected:', { error, errorCode, errorDescription, userMessage });
-          
-          if (isMounted) {
-            setError(userMessage);
-            setStatus('error');
-          }
-          return;
-        }
-
-        // Handle successful code exchange
-        if (code) {
-          console.log('AuthCallback: Authorization code found, starting exchange process');
-          console.log('AuthCallback: Code (first 10 chars):', code.substring(0, 10));
-          
-          const result = await authService.exchangeCodeForSession(code);
-          
-          console.log('AuthCallback: Code exchange result:', {
-            success: result?.success,
-            hasData: !!result?.data,
-            error: result?.error
-          });
-          
-          if (result?.success && isMounted) {
-            console.log('AuthCallback: Code exchange successful, setting success status');
-            setStatus('success');
-            
-            // Redirect to home dashboard after successful authentication
-            setTimeout(() => {
-              if (isMounted) {
-                console.log('AuthCallback: Redirecting to home dashboard');
-                navigate('/home-dashboard', { replace: true });
+          if (sessionExpiry > now) {
+            dispatch({
+              type: AUTH_ACTIONS.RESTORE_SESSION,
+              payload: {
+                user,
+                session,
+                isAuthenticated: true,
+                authMethod: session?.method || 'restored'
               }
-            }, 2000);
-          } else if (isMounted) {
-            console.log('AuthCallback: Code exchange failed:', result?.error);
-            
-            // Handle specific error types
-            let errorMessage = result?.error || 'Failed to process authentication. Please try again.';
-            
-            // Check for specific Supabase errors
-            if (result?.error?.includes('expired') || result?.error?.includes('otp_expired')) {
-              errorMessage = 'Your verification link has expired. Please request a new one.';
-            } else if (result?.error?.includes('invalid') || result?.error?.includes('code')) {
-              errorMessage = 'Invalid verification link. Please try signing up again.';
-            }
-            
-            setError(errorMessage);
-            setStatus('error');
-          }
-        } else {
-          // No code or error found - redirect to login
-          if (isMounted) {
-            console.log('AuthCallback: No authorization code found, redirecting to login');
-            navigate('/login-screen', { replace: true });
+            });
+          } else {
+            // Clear expired session
+            localStorage.removeItem('voiced_auth_user');
+            localStorage.removeItem('voiced_auth_session');
+            localStorage.removeItem('voiced_auth_status');
           }
         }
       } catch (error) {
-        console.log('AuthCallback: Processing error:', error);
-        if (isMounted) {
-          setError('Something went wrong processing your authentication. Please try again.');
-          setStatus('error');
+        console.error('Error restoring auth session:', error);
+        // Clear potentially corrupted data
+        localStorage.removeItem('voiced_auth_user');
+        localStorage.removeItem('voiced_auth_session');
+        localStorage.removeItem('voiced_auth_status');
+      }
+    };
+
+    restoreSession();
+  }, []);
+
+  // Persist auth data to localStorage
+  useEffect(() => {
+    if (state.isAuthenticated && state.user && state.session) {
+      localStorage.setItem('voiced_auth_user', JSON.stringify(state.user));
+      localStorage.setItem('voiced_auth_session', JSON.stringify(state.session));
+      localStorage.setItem('voiced_auth_status', 'authenticated');
+    } else {
+      localStorage.removeItem('voiced_auth_user');
+      localStorage.removeItem('voiced_auth_session');
+      localStorage.removeItem('voiced_auth_status');
+    }
+  }, [state.isAuthenticated, state.user, state.session]);
+
+  // Action creators
+  const signIn = async (credentials) => {
+    dispatch({ type: AUTH_ACTIONS.AUTH_START });
+    
+    try {
+      // Mock authentication - replace with actual authentication service
+      const response = await new Promise((resolve, reject) => {
+        setTimeout(() => {
+          if (credentials.email === 'demo@voiced.gov' && credentials.password === 'demo123') {
+            resolve({
+              user: {
+                id: '1',
+                email: 'demo@voiced.gov',
+                name: 'Demo User',
+                role: 'admin',
+                avatar: null,
+                created_at: new Date().toISOString()
+              },
+              session: {
+                access_token: 'mock_access_token_' + Date.now(),
+                refresh_token: 'mock_refresh_token_' + Date.now(),
+                expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(), // 24 hours
+                method: 'email'
+              }
+            });
+          } else if (credentials.email === 'user@voiced.gov' && credentials.password === 'user123') {
+            resolve({
+              user: {
+                id: '2',
+                email: 'user@voiced.gov',
+                name: 'Regular User',
+                role: 'user',
+                avatar: null,
+                created_at: new Date().toISOString()
+              },
+              session: {
+                access_token: 'mock_access_token_' + Date.now(),
+                refresh_token: 'mock_refresh_token_' + Date.now(),
+                expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+                method: 'email'
+              }
+            });
+          } else {
+            reject(new Error('Invalid credentials'));
+          }
+        }, 1500);
+      });
+      
+      dispatch({ 
+        type: AUTH_ACTIONS.AUTH_SUCCESS, 
+        payload: {
+          user: response.user,
+          session: response.session,
+          method: 'email'
         }
+      });
+      
+      return { success: true, user: response.user };
+    } catch (error) {
+      dispatch({ 
+        type: AUTH_ACTIONS.AUTH_FAILURE, 
+        payload: { error: error.message } 
+      });
+      
+      return { success: false, error: error.message };
+    }
+  };
+
+  const signInWithMagicLink = async (email) => {
+    dispatch({ type: AUTH_ACTIONS.AUTH_START });
+    
+    try {
+      // Mock magic link sending - replace with actual service
+      const response = await new Promise((resolve, reject) => {
+        setTimeout(() => {
+          if (email && email.includes('@')) {
+            resolve({
+              message: 'Magic link sent to your email',
+              email: email
+            });
+          } else {
+            reject(new Error('Invalid email address'));
+          }
+        }, 2000);
+      });
+      
+      dispatch({ type: AUTH_ACTIONS.CLEAR_ERROR });
+      
+      return { success: true, message: response.message };
+    } catch (error) {
+      dispatch({ 
+        type: AUTH_ACTIONS.AUTH_FAILURE, 
+        payload: { error: error.message } 
+      });
+      
+      return { success: false, error: error.message };
+    }
+  };
+
+  const signUp = async (userData) => {
+    dispatch({ type: AUTH_ACTIONS.AUTH_START });
+    
+    try {
+      // Mock registration - replace with actual service
+      const response = await new Promise((resolve, reject) => {
+        setTimeout(() => {
+          if (userData.email && userData.password && userData.name) {
+            resolve({
+              user: {
+                id: Date.now().toString(),
+                email: userData.email,
+                name: userData.name,
+                role: 'user',
+                avatar: null,
+                created_at: new Date().toISOString()
+              },
+              session: {
+                access_token: 'mock_access_token_' + Date.now(),
+                refresh_token: 'mock_refresh_token_' + Date.now(),
+                expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+                method: 'email'
+              }
+            });
+          } else {
+            reject(new Error('Missing required fields'));
+          }
+        }, 2000);
+      });
+      
+      dispatch({ 
+        type: AUTH_ACTIONS.AUTH_SUCCESS, 
+        payload: {
+          user: response.user,
+          session: response.session,
+          method: 'email'
+        }
+      });
+      
+      return { success: true, user: response.user };
+    } catch (error) {
+      dispatch({ 
+        type: AUTH_ACTIONS.AUTH_FAILURE, 
+        payload: { error: error.message } 
+      });
+      
+      return { success: false, error: error.message };
+    }
+  };
+
+  const signOut = async () => {
+    try {
+      // Clear any server-side session if needed
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      dispatch({ type: AUTH_ACTIONS.LOGOUT });
+      
+      return { success: true };
+    } catch (error) {
+      console.error('Error during sign out:', error);
+      // Force logout even if there's an error
+      dispatch({ type: AUTH_ACTIONS.LOGOUT });
+      return { success: false, error: error.message };
+    }
+  };
+
+  const clearError = () => {
+    dispatch({ type: AUTH_ACTIONS.CLEAR_ERROR });
+  };
+
+  const setCallbackData = (data) => {
+    dispatch({ type: AUTH_ACTIONS.SET_CALLBACK_DATA, payload: data });
+  };
+
+  const clearCallbackData = () => {
+    dispatch({ type: AUTH_ACTIONS.CLEAR_CALLBACK_DATA });
+  };
+
+  const value = {
+    // State
+    ...state,
+    
+    // Actions
+    signIn,
+    signInWithMagicLink,
+    signUp,
+    signOut,
+    clearError,
+    setCallbackData,
+    clearCallbackData
+  };
+
+  return (
+    <AuthContext.Provider value={value}>
+      {children}
+    </AuthContext.Provider>
+  );
+};
+
+// AuthCallback component for handling authentication callbacks
+export const AuthCallback = () => {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const { setCallbackData, clearError } = useAuth();
+  const [isProcessing, setIsProcessing] = React.useState(true);
+  const [error, setError] = React.useState(null);
+  const [success, setSuccess] = React.useState(false);
+
+  useEffect(() => {
+    const handleAuthCallback = async () => {
+      try {
+        console.log('AuthCallback: Processing callback');
+        console.log('AuthCallback: Current URL:', window.location.href);
+        console.log('AuthCallback: Location search:', location.search);
+        
+        const urlParams = new URLSearchParams(location.search);
+        const code = urlParams.get('code');
+        const error_code = urlParams.get('error');
+        const error_description = urlParams.get('error_description');
+        
+        if (error_code) {
+          console.error('AuthCallback: Error in URL params:', { error_code, error_description });
+          setError(error_description || 'Authentication failed');
+          setIsProcessing(false);
+          
+          // Redirect to login after delay
+          setTimeout(() => {
+            const errorMessage = encodeURIComponent(error_description || 'Authentication failed');
+            navigate(`/login-screen?error=${errorMessage}`, { replace: true });
+          }, 3000);
+          return;
+        }
+        
+        if (code) {
+          console.log('AuthCallback: Found auth code, processing...');
+          
+          // Mock processing of auth code - replace with actual authentication service
+          await new Promise(resolve => setTimeout(resolve, 2000));
+          
+          // Mock successful authentication
+          const mockUser = {
+            id: 'magic_' + Date.now(),
+            email: 'magic.user@voiced.gov',
+            name: 'Magic Link User',
+            role: 'user',
+            avatar: null,
+            created_at: new Date().toISOString()
+          };
+          
+          const mockSession = {
+            access_token: 'magic_token_' + Date.now(),
+            refresh_token: 'magic_refresh_' + Date.now(),
+            expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+            method: 'magic_link'
+          };
+          
+          // Store auth data
+          setCallbackData({ user: mockUser, session: mockSession });
+          
+          setSuccess(true);
+          setIsProcessing(false);
+          
+          console.log('AuthCallback: Authentication successful, redirecting...');
+          
+          // Redirect to dashboard after success
+          setTimeout(() => {
+            navigate('/home-dashboard', { replace: true });
+          }, 2000);
+        } else {
+          console.log('AuthCallback: No auth code found, redirecting to login');
+          setIsProcessing(false);
+          
+          // No code found, redirect to login
+          setTimeout(() => {
+            navigate('/login-screen', { replace: true });
+          }, 1000);
+        }
+      } catch (err) {
+        console.error('AuthCallback: Error processing callback:', err);
+        setError(err.message || 'An unexpected error occurred');
+        setIsProcessing(false);
+        
+        setTimeout(() => {
+          const errorMessage = encodeURIComponent(err.message || 'Authentication failed');
+          navigate(`/login-screen?error=${errorMessage}`, { replace: true });
+        }, 3000);
       }
     };
 
     handleAuthCallback();
+  }, [location.search, navigate, setCallbackData]);
 
-    return () => {
-      isMounted = false;
-    };
-  }, [location.search, navigate]);
-
-  const handleRetry = () => {
-    console.log('AuthCallback: User clicked retry, redirecting to registration');
-    navigate('/registration-screen', { replace: true });
-  };
-
-  const handleLoginRedirect = () => {
-    console.log('AuthCallback: User clicked login, redirecting to login');
-    navigate('/login-screen', { replace: true });
-  };
-
-  if (status === 'processing') {
+  if (isProcessing) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
-          <h2 className="text-xl font-semibold text-text-primary mb-2">Processing Authentication</h2>
-          <p className="text-text-secondary">Please wait while we verify your account...</p>
+          <div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <h2 className="text-xl font-semibold text-text-primary mb-2">Processing Authentication...</h2>
+          <p className="text-text-secondary">Please wait while we complete your sign-in.</p>
         </div>
       </div>
     );
   }
 
-  if (status === 'success') {
+  if (error) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="text-center">
-          <div className="w-12 h-12 bg-green-500 rounded-full flex items-center justify-center mx-auto mb-4">
-            <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <div className="text-center max-w-md mx-auto p-6">
+          <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <svg className="w-8 h-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </div>
+          <h2 className="text-xl font-semibold text-text-primary mb-2">Authentication Failed</h2>
+          <p className="text-text-secondary mb-4">{error}</p>
+          <p className="text-sm text-text-secondary">Redirecting to login page...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (success) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="text-center max-w-md mx-auto p-6">
+          <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
             </svg>
           </div>
           <h2 className="text-xl font-semibold text-text-primary mb-2">Authentication Successful!</h2>
-          <p className="text-text-secondary mb-4">Redirecting you to your dashboard...</p>
-          <div className="w-48 bg-gray-200 rounded-full h-2 mx-auto">
-            <div className="bg-primary h-2 rounded-full animate-pulse w-3/4"></div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (status === 'error') {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="max-w-md w-full mx-4">
-          <div className="bg-white rounded-lg shadow-lg p-6 text-center">
-            <div className="w-12 h-12 bg-red-500 rounded-full flex items-center justify-center mx-auto mb-4">
-              <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </div>
-            <h2 className="text-xl font-semibold text-text-primary mb-2">Authentication Failed</h2>
-            <p className="text-text-secondary mb-6">{error}</p>
-            <div className="flex flex-col sm:flex-row gap-3 justify-center">
-              <button
-                onClick={handleRetry}
-                className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-600 transition-colors duration-200"
-              >
-                Try Sign Up Again
-              </button>
-              <button
-                onClick={handleLoginRedirect}
-                className="px-4 py-2 border border-gray-300 text-text-primary rounded-lg hover:bg-gray-50 transition-colors duration-200"
-              >
-                Go to Login
-              </button>
-            </div>
-          </div>
+          <p className="text-text-secondary mb-4">Welcome to Voiced! You're being redirected to your dashboard.</p>
+          <p className="text-sm text-text-secondary">Redirecting...</p>
         </div>
       </div>
     );
   }
 
   return null;
-}
+};
 
-export function AuthProvider({ children }) {
-  const [user, setUser] = useState(null);
-  const [userProfile, setUserProfile] = useState(null);
-  const [jwtToken, setJwtToken] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [authError, setAuthError] = useState(null);
-
-  useEffect(() => {
-    let isMounted = true;
-
-    // Initialize auth state
-    const initializeAuth = async () => {
-      try {
-        setLoading(true);
-        setAuthError(null);
-        console.log('AuthProvider: Initializing authentication state');
-
-        const sessionResult = await authService.getSession();
-        console.log('AuthProvider: Session result:', {
-          success: sessionResult?.success,
-          hasSession: !!sessionResult?.data?.session,
-          hasUser: !!sessionResult?.data?.session?.user
-        });
-
-        if (
-          sessionResult?.success &&
-          sessionResult?.data?.session?.user &&
-          isMounted
-        ) {
-          const authUser = sessionResult.data.session.user;
-          setUser(authUser);
-          console.log('AuthProvider: User set from session:', authUser.id);
-
-          // Fetch user profile
-          console.log('AuthProvider: Fetching user profile');
-          const profileResult = await authService.getUserProfile(authUser.id);
-
-          if (profileResult?.success && isMounted) {
-            setUserProfile(profileResult.data);
-            console.log('AuthProvider: User profile loaded:', {
-              email: profileResult.data?.email,
-              tier: profileResult.data?.tier
-            });
-            
-            // Exchange for JWT token with profile data
-            console.log('AuthProvider: Exchanging for JWT token');
-            const jwtResult = await authService.exchangeForJWT();
-            if (jwtResult?.success && isMounted) {
-              setJwtToken(jwtResult.data);
-              console.log('AuthProvider: JWT token set successfully');
-            } else {
-              console.log('AuthProvider: JWT exchange failed:', jwtResult?.error);
-            }
-          } else if (isMounted) {
-            console.log('AuthProvider: Failed to load user profile:', profileResult?.error);
-            setAuthError(profileResult?.error || "Failed to load user profile");
-          }
-        } else {
-          console.log('AuthProvider: No valid session found');
-        }
-      } catch (error) {
-        if (isMounted) {
-          console.log('AuthProvider: Auth initialization error:', error);
-          setAuthError("Failed to initialize authentication");
-        }
-      } finally {
-        if (isMounted) {
-          setLoading(false);
-          console.log('AuthProvider: Authentication initialization complete');
-        }
-      }
-    };
-
-    initializeAuth();
-
-    // Listen for auth changes
-    const {
-      data: { subscription },
-    } = authService.onAuthStateChange(async (event, session) => {
-      if (!isMounted) return;
-
-      console.log('AuthProvider: Auth state changed:', { event, hasSession: !!session });
-      setAuthError(null);
-
-      if (event === "SIGNED_IN" && session?.user) {
-        setUser(session.user);
-        console.log('AuthProvider: User signed in:', session.user.id);
-
-        // Fetch user profile for signed in user
-        authService.getUserProfile(session.user.id).then((profileResult) => {
-          if (profileResult?.success && isMounted) {
-            setUserProfile(profileResult.data);
-            console.log('AuthProvider: Profile loaded after sign in');
-            
-            // Exchange for JWT token
-            authService.exchangeForJWT().then((jwtResult) => {
-              if (jwtResult?.success && isMounted) {
-                setJwtToken(jwtResult.data);
-                console.log('AuthProvider: JWT token obtained after sign in');
-              }
-            });
-          } else if (isMounted) {
-            console.log('AuthProvider: Profile load failed after sign in:', profileResult?.error);
-            setAuthError(profileResult?.error || "Failed to load user profile");
-          }
-        });
-      } else if (event === "SIGNED_OUT") {
-        console.log('AuthProvider: User signed out, clearing state');
-        setUser(null);
-        setUserProfile(null);
-        setJwtToken(null);
-      } else if (event === "TOKEN_REFRESHED" && session?.user) {
-        setUser(session.user);
-        console.log('AuthProvider: Token refreshed for user:', session.user.id);
-        
-        // Refresh JWT token when Supabase token refreshes
-        authService.refreshJWT().then((jwtResult) => {
-          if (jwtResult?.success && isMounted) {
-            setJwtToken(jwtResult.data);
-            console.log('AuthProvider: JWT token refreshed');
-          }
-        });
-      }
-    });
-
-    return () => {
-      isMounted = false;
-      subscription?.unsubscribe?.();
-    };
-  }, []);
-
-  // Sign in function
-  const signIn = async (email, password) => {
-    try {
-      setAuthError(null);
-      console.log('AuthProvider: Starting sign in for:', email);
-      const result = await authService.signIn(email, password);
-
-      if (!result?.success) {
-        console.log('AuthProvider: Sign in failed:', result?.error);
-        setAuthError(result?.error || "Login failed");
-        return { success: false, error: result?.error };
-      }
-
-      console.log('AuthProvider: Sign in successful');
-      return { success: true, data: result.data };
-    } catch (error) {
-      const errorMsg = "Something went wrong during login. Please try again.";
-      console.log('AuthProvider: Sign in exception:', error);
-      setAuthError(errorMsg);
-      return { success: false, error: errorMsg };
-    }
-  };
-
-  // Sign up function
-  const signUp = async (email, password, userData = {}) => {
-    try {
-      setAuthError(null);
-      console.log('AuthProvider: Starting sign up for:', email);
-      const result = await authService.signUp(email, password, userData);
-
-      if (!result?.success) {
-        console.log('AuthProvider: Sign up failed:', result?.error);
-        setAuthError(result?.error || "Signup failed");
-        return { success: false, error: result?.error };
-      }
-
-      console.log('AuthProvider: Sign up successful');
-      return { success: true, data: result.data };
-    } catch (error) {
-      const errorMsg = "Something went wrong during signup. Please try again.";
-      console.log('AuthProvider: Sign up exception:', error);
-      setAuthError(errorMsg);
-      return { success: false, error: errorMsg };
-    }
-  };
-
-  // Sign out function
-  const signOut = async () => {
-    try {
-      setAuthError(null);
-      console.log('AuthProvider: Starting sign out');
-      const result = await authService.signOut();
-
-      if (!result?.success) {
-        console.log('AuthProvider: Sign out failed:', result?.error);
-        setAuthError(result?.error || "Logout failed");
-        return { success: false, error: result?.error };
-      }
-
-      console.log('AuthProvider: Sign out successful');
-      return { success: true };
-    } catch (error) {
-      const errorMsg = "Something went wrong during logout. Please try again.";
-      console.log('AuthProvider: Sign out exception:', error);
-      setAuthError(errorMsg);
-      return { success: false, error: errorMsg };
-    }
-  };
-
-  // Update profile function
-  const updateProfile = async (updates) => {
-    try {
-      setAuthError(null);
-
-      if (!user?.id) {
-        const errorMsg = "User not authenticated";
-        setAuthError(errorMsg);
-        return { success: false, error: errorMsg };
-      }
-
-      console.log('AuthProvider: Updating profile for user:', user.id);
-      const result = await authService.updateUserProfile(user.id, updates);
-
-      if (!result?.success) {
-        console.log('AuthProvider: Profile update failed:', result?.error);
-        setAuthError(result?.error || "Profile update failed");
-        return { success: false, error: result?.error };
-      }
-
-      setUserProfile(result.data);
-      console.log('AuthProvider: Profile updated successfully');
-      
-      // JWT is automatically refreshed in the service
-      const updatedJWT = authService.getCurrentJWT();
-      if (updatedJWT) {
-        setJwtToken(updatedJWT);
-      }
-      
-      return { success: true, data: result.data };
-    } catch (error) {
-      const errorMsg = "Something went wrong updating profile. Please try again.";
-      console.log('AuthProvider: Profile update exception:', error);
-      setAuthError(errorMsg);
-      return { success: false, error: errorMsg };
-    }
-  };
-
-  // Reset password function
-  const resetPassword = async (email) => {
-    try {
-      setAuthError(null);
-      console.log('AuthProvider: Resetting password for:', email);
-      const result = await authService.resetPassword(email);
-
-      if (!result?.success) {
-        console.log('AuthProvider: Password reset failed:', result?.error);
-        setAuthError(result?.error || "Password reset failed");
-        return { success: false, error: result?.error };
-      }
-
-      console.log('AuthProvider: Password reset successful');
-      return { success: true };
-    } catch (error) {
-      const errorMsg = "Something went wrong sending reset email. Please try again.";
-      console.log('AuthProvider: Password reset exception:', error);
-      setAuthError(errorMsg);
-      return { success: false, error: errorMsg };
-    }
-  };
-
-  // Exchange for JWT token function
-  const exchangeJWT = async (customClaims = {}) => {
-    try {
-      setAuthError(null);
-      console.log('AuthProvider: Exchanging for JWT token');
-      const result = await authService.exchangeForJWT(customClaims);
-
-      if (!result?.success) {
-        console.log('AuthProvider: JWT exchange failed:', result?.error);
-        setAuthError(result?.error || "JWT exchange failed");
-        return { success: false, error: result?.error };
-      }
-
-      setJwtToken(result.data);
-      console.log('AuthProvider: JWT exchange successful');
-      return { success: true, data: result.data };
-    } catch (error) {
-      const errorMsg = "Something went wrong exchanging JWT token. Please try again.";
-      console.log('AuthProvider: JWT exchange exception:', error);
-      setAuthError(errorMsg);
-      return { success: false, error: errorMsg };
-    }
-  };
-
-  // Refresh JWT token function
-  const refreshJWT = async (customClaims = {}) => {
-    try {
-      setAuthError(null);
-      const result = await authService.refreshJWT(customClaims);
-
-      if (!result?.success) {
-        setAuthError(result?.error || "JWT refresh failed");
-        return { success: false, error: result?.error };
-      }
-
-      setJwtToken(result.data);
-      return { success: true, data: result.data };
-    } catch (error) {
-      const errorMsg = "Something went wrong refreshing JWT token. Please try again.";
-      setAuthError(errorMsg);
-      console.log("AuthProvider: JWT refresh exception:", error);
-      return { success: false, error: errorMsg };
-    }
-  };
-
-  // Validate JWT token function
-  const validateJWT = async (token) => {
-    try {
-      setAuthError(null);
-      const result = await authService.validateJWT(token || jwtToken?.jwt_token);
-
-      if (!result?.success) {
-        setAuthError(result?.error || "JWT validation failed");
-        return { success: false, error: result?.error };
-      }
-
-      return { success: true, data: result.data };
-    } catch (error) {
-      const errorMsg = "Something went wrong validating JWT token. Please try again.";
-      setAuthError(errorMsg);
-      console.log("AuthProvider: JWT validation exception:", error);
-      return { success: false, error: errorMsg };
-    }
-  };
-
-  // Handle authorization code callback
-  const handleAuthCallback = async (code) => {
-    try {
-      setAuthError(null);
-      console.log('AuthProvider: Handling auth callback with code');
-      const result = await authService.exchangeCodeForSession(code);
-
-      if (!result?.success) {
-        console.log('AuthProvider: Auth callback failed:', result?.error);
-        setAuthError(result?.error || "Authentication callback failed");
-        return { success: false, error: result?.error };
-      }
-
-      console.log('AuthProvider: Auth callback successful');
-      return { success: true, data: result.data };
-    } catch (error) {
-      const errorMsg = "Something went wrong processing authentication callback.";
-      console.log('AuthProvider: Auth callback exception:', error);
-      setAuthError(errorMsg);
-      return { success: false, error: errorMsg };
-    }
-  };
-
-  const value = {
-    user,
-    userProfile,
-    jwtToken,
-    loading,
-    authError,
-    signIn,
-    signUp,
-    signOut,
-    updateProfile,
-    resetPassword,
-    exchangeJWT,
-    refreshJWT,
-    validateJWT,
-    handleAuthCallback,
-    clearError: () => setAuthError(null),
-  };
-
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
-}
-
+// Custom hook to use auth context
 export const useAuth = () => {
   const context = useContext(AuthContext);
-  if (!context) {
-    throw new Error("useAuth must be used within an AuthProvider");
+  if (context === undefined) {
+    throw new Error('useAuth must be used within an AuthProvider');
   }
   return context;
 };

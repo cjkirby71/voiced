@@ -1,119 +1,132 @@
 // src/pages/login-screen/index.jsx
-import React, { useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { Helmet } from 'react-helmet';
+import React, { useEffect, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
+import { useAuth } from '../../context/AuthContext';
 import LoginForm from './components/LoginForm';
 import SocialAuthButtons from './components/SocialAuthButtons';
-import Icon from 'components/AppIcon';
-import { useAuth } from '../../context/AuthContext';
+import AppImage from '../../components/AppImage';
 
-const LoginScreen = () => {
-  const navigate = useNavigate();
+function LoginScreen() {
   const { user, loading } = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const [sessionMessage, setSessionMessage] = useState('');
 
-  // Redirect if already authenticated
+  // Handle session expiration message
   useEffect(() => {
-    if (!loading && user) {
-      navigate('/home-dashboard');
+    if (location?.state?.message) {
+      setSessionMessage(location.state.message);
+      // Clear the message from location state
+      navigate(location.pathname, { replace: true, state: {} });
+    }
+  }, [location?.state?.message, navigate, location.pathname]);
+
+  // Auto-redirect if already authenticated
+  useEffect(() => {
+    if (user && !loading) {
+      navigate('/home-dashboard', { replace: true });
     }
   }, [user, loading, navigate]);
 
-  // Show loading while checking auth state
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="flex items-center space-x-2">
-          <Icon name="Loader2" size={24} className="animate-spin text-primary" />
-          <span className="text-text-muted">Loading...</span>
-        </div>
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
       </div>
     );
   }
 
   return (
-    <>
-      <Helmet>
-        <title>Sign In - Voiced</title>
-        <meta name="description" content="Sign in to your Voiced account to access polls, articles, and connect with your representatives." />
-      </Helmet>
-      
-      <div className="min-h-screen bg-background flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen flex">
+      {/* Left side - Hero Section */}
+      <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-blue-600 to-purple-700 relative overflow-hidden">
+        <div className="absolute inset-0 bg-black opacity-20"></div>
+        <div className="relative z-10 flex flex-col justify-center items-center text-white p-12">
+          <div className="max-w-md text-center">
+            <h1 className="text-4xl font-bold mb-6">
+              Welcome Back to Voiced
+            </h1>
+            <p className="text-xl mb-8 text-blue-100">
+              Connect with your representatives, participate in polls, and stay informed about the issues that matter to you.
+            </p>
+            <div className="w-64 h-48 mx-auto rounded-lg overflow-hidden shadow-2xl">
+              <AppImage 
+                src="https://images.unsplash.com/photo-1551632811-561732d1e306?w=400&h=300&fit=crop&crop=center"
+                alt="Democratic participation"
+                className="w-full h-full object-cover"
+                fallbackSrc="https://images.pexels.com/photos/1550337/pexels-photo-1550337.jpeg?w=400&h=300&fit=crop&crop=center"
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Right side - Login Form */}
+      <div className="w-full lg:w-1/2 flex items-center justify-center p-8 bg-white">
         <div className="max-w-md w-full space-y-8">
           {/* Header */}
           <div className="text-center">
-            <div className="flex justify-center mb-6">
-              <div className="w-16 h-16 bg-primary rounded-full flex items-center justify-center">
-                <Icon name="Vote" size={32} className="text-white" />
-              </div>
-            </div>
-            <h2 className="text-3xl font-bold text-text-primary mb-2">
-              Welcome back to Voiced
+            <h2 className="text-3xl font-bold text-gray-900 mb-2">
+              Sign In
             </h2>
-            <p className="text-text-muted">
-              Sign in to your account to continue engaging with your community
+            <p className="text-gray-600">
+              Access your Voiced account to continue
             </p>
+            
+            {/* Session expiration message */}
+            {sessionMessage && (
+              <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-md">
+                <div className="flex items-center">
+                  <svg className="w-5 h-5 text-yellow-400 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                  </svg>
+                  <p className="text-sm text-yellow-800">{sessionMessage}</p>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Login Form */}
-          <div className="bg-surface p-8 rounded-xl shadow-sm border border-border">
-            <LoginForm />
+          <LoginForm />
 
-            {/* Divider */}
-            <div className="mt-6">
-              <div className="relative">
-                <div className="absolute inset-0 flex items-center">
-                  <div className="w-full border-t border-border" />
-                </div>
-                <div className="relative flex justify-center text-sm">
-                  <span className="px-2 bg-surface text-text-muted">Or continue with</span>
-                </div>
-              </div>
+          {/* Separator */}
+          <div className="relative">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-gray-300" />
             </div>
-
-            {/* Social Auth */}
-            <div className="mt-6">
-              <SocialAuthButtons />
-            </div>
-
-            {/* Footer Links */}
-            <div className="mt-6 text-center space-y-2">
-              <p className="text-sm text-text-muted">
-                Do not have an account?{' '}
-                <Link 
-                  to="/registration-screen" 
-                  className="font-medium text-primary hover:text-primary-700 transition-colors duration-200"
-                >
-                  Sign up
-                </Link>
-              </p>
-              <p className="text-sm">
-                <Link 
-                  to="/forgot-password" 
-                  className="font-medium text-primary hover:text-primary-700 transition-colors duration-200"
-                >
-                  Forgot your password?
-                </Link>
-              </p>
+            <div className="relative flex justify-center text-sm">
+              <span className="px-2 bg-white text-gray-500">Or continue with</span>
             </div>
           </div>
 
-          {/* Bottom Help Text */}
-          <div className="text-center">
-            <p className="text-xs text-text-muted">
-              By signing in, you agree to our{' '}
-              <Link to="/terms" className="text-primary hover:text-primary-700 underline">
-                Terms of Service
-              </Link>
-              {' '}and{' '}
-              <Link to="/privacy" className="text-primary hover:text-primary-700 underline">
-                Privacy Policy
-              </Link>
+          {/* Social Auth */}
+          <SocialAuthButtons />
+
+          {/* Footer */}
+          <div className="text-center space-y-2">
+            <p className="text-sm text-gray-600">
+              Don't have an account?{' '}
+              <button
+                onClick={() => navigate('/registration-screen')}
+                className="font-medium text-blue-600 hover:text-blue-500 transition-colors duration-200"
+              >
+                Sign up here
+              </button>
+            </p>
+            <p className="text-xs text-gray-500">
+              Having trouble? Check our{' '}
+              <button
+                onClick={() => navigate('/authentication-setup-guide')}
+                className="text-blue-600 hover:text-blue-500 underline"
+              >
+                authentication guide
+              </button>
             </p>
           </div>
         </div>
       </div>
-    </>
+    </div>
   );
-};
+}
 
 export default LoginScreen;
