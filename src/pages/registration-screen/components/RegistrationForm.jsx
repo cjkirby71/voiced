@@ -27,6 +27,8 @@ const RegistrationForm = ({
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [passwordStrength, setPasswordStrength] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
+  const [signupSuccess, setSignupSuccess] = useState(false);
+  const [successMessage, setSuccessMessage] = useState('');
 
   const calculatePasswordStrength = (password) => {
     let strength = 0;
@@ -166,7 +168,11 @@ const RegistrationForm = ({
       });
 
       if (result.success) {
-        // Redirect will be handled by auth state change or show confirmation
+        setSignupSuccess(true);
+        setSuccessMessage(
+          result.message || 
+          'Account created successfully! Please check your email to confirm your account and complete the registration process.'
+        );
         console.log('Registration successful');
       }
     } catch (error) {
@@ -175,6 +181,68 @@ const RegistrationForm = ({
       setIsLoading(false);
     }
   };
+
+  // Show success message after successful signup
+  if (signupSuccess) {
+    return (
+      <div className="text-center space-y-6">
+        {/* Success Icon */}
+        <div className="flex justify-center">
+          <div className="w-16 h-16 bg-green-500 rounded-full flex items-center justify-center">
+            <Icon name="Check" size={32} className="text-white" />
+          </div>
+        </div>
+        
+        {/* Success Message */}
+        <div>
+          <h3 className="text-xl font-semibold text-text-primary mb-2">
+            Registration Successful!
+          </h3>
+          <p className="text-text-secondary">
+            {successMessage}
+          </p>
+        </div>
+        
+        {/* Additional Instructions */}
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+          <div className="flex items-start space-x-3">
+            <Icon name="Info" size={20} className="text-blue-600 mt-0.5" />
+            <div className="text-left">
+              <h4 className="font-medium text-blue-800 mb-1">Next Steps:</h4>
+              <ul className="text-sm text-blue-700 space-y-1">
+                <li>• Check your email inbox for a confirmation link</li>
+                <li>• Click the link to verify your email address</li>
+                <li>• You'll be automatically signed in after verification</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+        
+        {/* Action Button */}
+        <button
+          onClick={() => {
+            setSignupSuccess(false);
+            setFormData({
+              fullName: '',
+              email: '',
+              password: '',
+              confirmPassword: '',
+              zipCode: '',
+              phoneNumber: '',
+              smsNotifications: false,
+              emailNotifications: true,
+              termsAccepted: false,
+              privacyAccepted: false
+            });
+            setCurrentStep(1);
+          }}
+          className="w-full py-3 px-4 bg-primary text-white font-medium rounded-lg hover:bg-primary-700 transition-colors duration-200"
+        >
+          Register Another Account
+        </button>
+      </div>
+    );
+  }
 
   const strengthIndicator = getPasswordStrengthText(passwordStrength);
 

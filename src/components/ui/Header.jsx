@@ -1,13 +1,17 @@
+// src/components/ui/Header.jsx
 import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import Icon from '../AppIcon';
-import { useUser } from '../../context/UserContext';
+import { useAuth } from '../../context/AuthContext';
 
 const Header = () => {
   const location = useLocation();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const { user, isAuthenticated, logout } = useUser();
+  const { user, userProfile, loading, signOut } = useAuth();
 
+  // Determine if user is authenticated
+  const isAuthenticated = !loading && user && userProfile;
+  
   const navigationItems = [
     { label: 'Home', path: '/home-dashboard', icon: 'Home' },
     { label: 'News', path: '/journalism-hub', icon: 'Newspaper' },
@@ -18,7 +22,7 @@ const Header = () => {
   ];
 
   // Add admin dashboard link for admin users
-  if (user?.role === 'admin') {
+  if (userProfile?.role === 'admin') {
     navigationItems.push({ label: 'Admin', path: '/admin-dashboard', icon: 'Settings' });
   }
 
@@ -28,13 +32,13 @@ const Header = () => {
     setIsMobileMenuOpen(!isMobileMenuOpen);
   };
 
-  const handleLogout = () => {
-    logout();
+  const handleLogout = async () => {
+    await signOut();
     setIsMobileMenuOpen(false);
   };
 
   // Don't show header on login/registration screens
-  if (location.pathname === '/login-screen' || location.pathname === '/registration-screen') {
+  if (location.pathname === '/login-screen' || location.pathname === '/registration-screen' || location.pathname.startsWith('/auth/')) {
     return null;
   }
 
@@ -80,8 +84,8 @@ const Header = () => {
             {isAuthenticated ? (
               <div className="flex items-center space-x-3">
                 <div className="text-right">
-                  <p className="text-sm font-medium text-text-primary">{user?.name}</p>
-                  <p className="text-xs text-text-secondary capitalize">{user?.role}</p>
+                  <p className="text-sm font-medium text-text-primary">{userProfile?.full_name || user?.email}</p>
+                  <p className="text-xs text-text-secondary capitalize">{userProfile?.tier || 'free'}</p>
                 </div>
                 <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center">
                   <Icon name="User" size={16} color="white" />
@@ -140,8 +144,8 @@ const Header = () => {
               {isAuthenticated && (
                 <div className="border-t border-border pt-4 mt-4">
                   <div className="px-4 py-2">
-                    <p className="text-sm font-medium text-text-primary">{user?.name}</p>
-                    <p className="text-xs text-text-secondary capitalize">{user?.role}</p>
+                    <p className="text-sm font-medium text-text-primary">{userProfile?.full_name || user?.email}</p>
+                    <p className="text-xs text-text-secondary capitalize">{userProfile?.tier || 'free'}</p>
                   </div>
                   <button
                     onClick={handleLogout}

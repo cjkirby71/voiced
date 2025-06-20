@@ -1,8 +1,10 @@
+// src/pages/user-profile-representative-contact/index.jsx
 import React, { useState } from 'react';
 import Icon from 'components/AppIcon';
 import Image from 'components/AppImage';
 import SubscriptionStatusIndicator from 'components/ui/SubscriptionStatusIndicator';
 import RepresentativeContactQuickAccess from 'components/ui/RepresentativeContactQuickAccess';
+import { useAuth } from 'context/AuthContext';
 import ProfileSettings from './components/ProfileSettings';
 import RepresentativeCard from './components/RepresentativeCard';
 import CommunicationHistory from './components/CommunicationHistory';
@@ -12,53 +14,124 @@ const UserProfileRepresentativeContact = () => {
   const [activeTab, setActiveTab] = useState('profile');
   const [isContactPanelOpen, setIsContactPanelOpen] = useState(false);
   const [selectedRepresentative, setSelectedRepresentative] = useState(null);
+  
+  // Get user data from AuthContext
+  const { user, userProfile, loading, authError } = useAuth();
 
-  // Mock user data
+  // Loading state
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+          <h2 className="text-xl font-semibold text-text-primary mb-2">Loading Profile</h2>
+          <p className="text-text-secondary">Please wait while we load your information...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Error state
+  if (authError) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="max-w-md w-full mx-4">
+          <div className="bg-white rounded-lg shadow-lg p-6 text-center">
+            <div className="w-12 h-12 bg-red-500 rounded-full flex items-center justify-center mx-auto mb-4">
+              <Icon name="AlertCircle" size={24} className="text-white" />
+            </div>
+            <h2 className="text-xl font-semibold text-text-primary mb-2">Profile Load Error</h2>
+            <p className="text-text-secondary mb-6">{authError}</p>
+            <button
+              onClick={() => window.location.reload()}
+              className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-600 transition-colors duration-200"
+            >
+              Retry
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Not authenticated state
+  if (!user) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="max-w-md w-full mx-4">
+          <div className="bg-white rounded-lg shadow-lg p-6 text-center">
+            <div className="w-12 h-12 bg-yellow-500 rounded-full flex items-center justify-center mx-auto mb-4">
+              <Icon name="Lock" size={24} className="text-white" />
+            </div>
+            <h2 className="text-xl font-semibold text-text-primary mb-2">Authentication Required</h2>
+            <p className="text-text-secondary mb-6">Please sign in to view your profile and representative information.</p>
+            <div className="flex flex-col sm:flex-row gap-3 justify-center">
+              <button
+                onClick={() => window.location.href = '/login-screen'}
+                className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-600 transition-colors duration-200"
+              >
+                Sign In
+              </button>
+              <button
+                onClick={() => window.location.href = '/registration-screen'}
+                className="px-4 py-2 border border-gray-300 text-text-primary rounded-lg hover:bg-gray-50 transition-colors duration-200"
+              >
+                Sign Up
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Prepare user data from auth context
   const userData = {
-    name: 'Sarah Johnson',
-    email: 'sarah.johnson@email.com',
-    location: 'San Francisco, CA',
-    district: 'CA-12',
-    joinDate: '03/15/2024',
-    subscriptionTier: 'National',
-    avatar: 'https://images.unsplash.com/photo-1494790108755-2616b612b786?w=150&h=150&fit=crop&crop=face',
-    bio: `Passionate about civic engagement and government transparency. I believe in the power of informed citizens to drive positive change in our democracy. Active in local community organizations and committed to staying informed about federal legislation that impacts our daily lives.`,
+    name: userProfile?.full_name || user?.email?.split('@')[0] || 'User',
+    email: user?.email || 'No email provided',
+    location: userProfile?.zip_code ? `ZIP ${userProfile.zip_code}` : 'Location not set',
+    district: 'N/A', // This would come from location-based lookup
+    joinDate: user?.created_at ? new Date(user.created_at).toLocaleDateString() : 'Unknown',
+    subscriptionTier: userProfile?.tier || 'free',
+    avatar: user?.user_metadata?.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(userProfile?.full_name || user?.email || 'U')}&background=6366f1&color=fff`,
+    bio: userProfile?.bio || `Welcome to Voiced! I'm engaged in civic activities and committed to staying informed about legislation that impacts our community.`,
     preferences: {
-      emailNotifications: true,
+      emailNotifications: userProfile?.email_notifications !== false,
       pollReminders: true,
       newsAlerts: false,
-      representativeUpdates: true
+      representativeUpdates: true,
+      smsNotifications: userProfile?.sms_notifications || false
     }
   };
 
-  // Mock representative data
+  // Mock representative data (in real app, this would be fetched based on user location)
   const representatives = [
     {
       id: 1,
-      name: 'Senator Dianne Feinstein',
+      name: 'Senator Example',
       title: 'U.S. Senator',
-      party: 'Democratic',
-      state: 'California',
-      office: 'Hart Senate Office Building, Room 331',
+      party: 'Independent',
+      state: 'Your State',
+      office: 'Senate Office Building, Room 123',
       address: 'Washington, DC 20510',
-      phone: '(202) 224-3841',
-      email: 'senator@feinstein.senate.gov',
-      website: 'https://www.feinstein.senate.gov',
+      phone: '(202) 224-0000',
+      email: 'senator@example.senate.gov',
+      website: 'https://example.senate.gov',
       image: 'https://images.unsplash.com/photo-1560250097-0b93528c311a?w=150&h=150&fit=crop&crop=face',
-      nextElection: '2024',
-      committees: ['Judiciary', 'Intelligence', 'Appropriations']
+      nextElection: '2026',
+      committees: ['Judiciary', 'Finance']
     },
     {
       id: 2,
-      name: 'Rep. Nancy Pelosi',
+      name: 'Rep. Example',
       title: 'U.S. Representative',
-      party: 'Democratic',
-      district: 'CA-12',
-      office: 'Rayburn House Office Building, Room 2371',
+      party: 'Independent',
+      district: 'Your District',
+      office: 'House Office Building, Room 456',
       address: 'Washington, DC 20515',
-      phone: '(202) 225-5161',
-      email: 'rep.pelosi@mail.house.gov',
-      website: 'https://pelosi.house.gov',
+      phone: '(202) 225-0000',
+      email: 'rep.example@mail.house.gov',
+      website: 'https://example.house.gov',
       image: 'https://images.unsplash.com/photo-1551836022-deb4988cc6c0?w=150&h=150&fit=crop&crop=face',
       nextElection: '2024',
       committees: ['House Leadership', 'Budget']
@@ -71,28 +144,19 @@ const UserProfileRepresentativeContact = () => {
       id: 1,
       type: 'poll_response',
       title: 'Federal Infrastructure Bill Support',
-      date: '12/08/2024',
+      date: new Date().toLocaleDateString(),
       response: 'Yes',
-      representative: 'Senator Dianne Feinstein',
+      representative: 'Senator Example',
       status: 'sent'
     },
     {
       id: 2,
       type: 'message',
       title: 'Healthcare Reform Concerns',
-      date: '12/05/2024',
+      date: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toLocaleDateString(),
       content: 'Regarding the proposed healthcare legislation...',
-      representative: 'Rep. Nancy Pelosi',
+      representative: 'Rep. Example',
       status: 'delivered'
-    },
-    {
-      id: 3,
-      type: 'poll_response',
-      title: 'Climate Change Action Plan',
-      date: '12/01/2024',
-      response: 'Yes',
-      representative: 'Both Representatives',
-      status: 'sent'
     }
   ];
 
@@ -205,15 +269,15 @@ const UserProfileRepresentativeContact = () => {
                   <div className="space-y-4">
                     <div className="flex items-center justify-between">
                       <span className="text-text-secondary">Polls Participated</span>
-                      <span className="font-semibold text-text-primary">23</span>
+                      <span className="font-semibold text-text-primary">0</span>
                     </div>
                     <div className="flex items-center justify-between">
                       <span className="text-text-secondary">Messages Sent</span>
-                      <span className="font-semibold text-text-primary">8</span>
+                      <span className="font-semibold text-text-primary">0</span>
                     </div>
                     <div className="flex items-center justify-between">
                       <span className="text-text-secondary">Articles Shared</span>
-                      <span className="font-semibold text-text-primary">12</span>
+                      <span className="font-semibold text-text-primary">0</span>
                     </div>
                   </div>
                 </div>
@@ -228,8 +292,8 @@ const UserProfileRepresentativeContact = () => {
                       <SubscriptionStatusIndicator tier={userData.subscriptionTier} />
                     </div>
                     <div className="flex items-center justify-between">
-                      <span className="text-text-secondary">Next Billing</span>
-                      <span className="text-sm text-text-primary">01/15/2025</span>
+                      <span className="text-text-secondary">Account Status</span>
+                      <span className="text-sm text-green-600 font-medium">Active</span>
                     </div>
                     <button className="w-full mt-4 px-4 py-2 text-sm font-medium text-primary border border-primary rounded-lg hover:bg-primary-50 transition-colors duration-200">
                       Manage Subscription

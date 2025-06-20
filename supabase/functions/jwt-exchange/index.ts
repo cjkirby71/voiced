@@ -39,6 +39,7 @@ serve(async (req) => {
     // Get the JWT secret from environment
     const jwtSecret = Deno.env.get("SUPABASE_JWT_SECRET");
     if (!jwtSecret) {
+      console.error("JWT secret not configured");
       throw new Error("JWT secret not configured");
     }
 
@@ -51,7 +52,15 @@ serve(async (req) => {
       exchange_type
     }: JWTExchangeRequest = await req.json();
 
+    console.log("JWT Exchange Request:", {
+      exchange_type,
+      has_authorization_code: !!authorization_code,
+      has_current_token: !!current_token,
+      custom_claims_keys: Object.keys(custom_claims || {})
+    });
+
     if (!exchange_type) {
+      console.error("Missing exchange_type parameter");
       return new Response(
         JSON.stringify({ error: "Missing exchange_type parameter" }),
         {
@@ -66,13 +75,18 @@ serve(async (req) => {
 
     // Handle different exchange types
     if (exchange_type === "authorization_code" && authorization_code) {
-      console.log("Exchanging authorization code for session");
+      console.log("Starting authorization code exchange process");
+      console.log("Authorization code (first 10 chars):", authorization_code.substring(0, 10));
       
       // Exchange authorization code for session
       const { data, error } = await supabaseClient.auth.exchangeCodeForSession(authorization_code);
       
       if (error) {
-        console.error("Code exchange error:", error);
+        console.error("Authorization code exchange failed:", {
+          error_message: error.message,
+          error_code: error.name,
+          error_status: error.status
+        });
         return new Response(
           JSON.stringify({ 
             error: "Failed to exchange authorization code",
@@ -88,15 +102,21 @@ serve(async (req) => {
 
       user = data.user;
       session = data.session;
-      console.log("Code exchange successful for user:", user?.id);
+      console.log("Authorization code exchange successful:", {
+        user_id: user?.id,
+        user_email: user?.email,
+        session_exists: !!session,
+        access_token_exists: !!session?.access_token
+      });
       
     } else if (exchange_type === "custom_jwt" && current_token) {
-      console.log("Validating current token for JWT exchange");
+      console.log("Starting custom JWT exchange with current token");
       
       // Verify the current Supabase token
       const { data: { user: authUser }, error: userError } = await supabaseClient.auth.getUser(current_token);
       
       if (userError || !authUser) {
+        console.error("Current token validation failed:", userError);
         return new Response(
           JSON.stringify({ error: "Invalid or expired token" }),
           {
@@ -107,8 +127,17 @@ serve(async (req) => {
       }
 
       user = authUser;
+      console.log("Current token validation successful:", {
+        user_id: user?.id,
+        user_email: user?.email
+      });
       
     } else {
+      console.error("Invalid exchange request:", {
+        exchange_type,
+        has_authorization_code: !!authorization_code,
+        has_current_token: !!current_token
+      });
       return new Response(
         JSON.stringify({ 
           error: "Invalid exchange type or missing required parameters",
@@ -122,6 +151,7 @@ serve(async (req) => {
     }
 
     if (!user) {
+      console.error("No user found after exchange process");
       return new Response(
         JSON.stringify({ error: "No user found in exchange process" }),
         {
@@ -164,6 +194,13 @@ serve(async (req) => {
       exchange_source: authorization_code ? "authorization_code" : "current_token"
     };
 
+    console.log("Creating JWT with payload:", {
+      user_id: jwtPayload.sub,
+      email: jwtPayload.email,
+      expires_at: new Date(expiresAt * 1000).toISOString(),
+      custom_claims_included: Object.keys(custom_claims || {})
+    });
+
     // Create the JWT
     const key = await crypto.subtle.importKey(
       "raw",
@@ -175,8 +212,8 @@ serve(async (req) => {
 
     const jwt = await create({ alg: "HS256", typ: "JWT" }, jwtPayload, key);
 
-    // Log the token exchange for monitoring
-    console.log(`JWT token exchanged for user: ${user.id}, type: ${exchange_type}`);
+    // Log the successful token exchange
+    console.log(`JWT token successfully created for user: ${user.id}, type: ${exchange_type}`);
 
     const response: JWTExchangeResponse = {
       jwt_token: jwt,
@@ -191,7 +228,8 @@ serve(async (req) => {
     });
 
   } catch (error) {
-    console.error("JWT Exchange Error:", error);
+    console.error("JWT Exchange Error - Stack trace:", error);
+    console.error("JWT Exchange Error - Message:", error.message);
     
     return new Response(
       JSON.stringify({ 

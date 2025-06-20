@@ -17,11 +17,22 @@ export function AuthCallback() {
 
     const handleAuthCallback = async () => {
       try {
+        console.log('AuthCallback: Starting callback processing');
+        console.log('AuthCallback: Current URL:', window.location.href);
+        console.log('AuthCallback: Search params:', location.search);
+        
         const urlParams = new URLSearchParams(location.search);
         const code = urlParams.get('code');
         const error = urlParams.get('error');
         const errorCode = urlParams.get('error_code');
         const errorDescription = urlParams.get('error_description');
+
+        console.log('AuthCallback: Extracted params:', {
+          hasCode: !!code,
+          hasError: !!error,
+          errorCode,
+          errorDescription
+        });
 
         // Handle error cases first
         if (error) {
@@ -33,7 +44,7 @@ export function AuthCallback() {
             userMessage = decodeURIComponent(errorDescription.replace(/\+/g, ' '));
           }
           
-          console.log('Auth callback error:', { error, errorCode, errorDescription });
+          console.log('AuthCallback: Error detected:', { error, errorCode, errorDescription, userMessage });
           
           if (isMounted) {
             setError(userMessage);
@@ -44,34 +55,53 @@ export function AuthCallback() {
 
         // Handle successful code exchange
         if (code) {
-          console.log('Processing authorization code...');
+          console.log('AuthCallback: Authorization code found, starting exchange process');
+          console.log('AuthCallback: Code (first 10 chars):', code.substring(0, 10));
           
           const result = await authService.exchangeCodeForSession(code);
           
+          console.log('AuthCallback: Code exchange result:', {
+            success: result?.success,
+            hasData: !!result?.data,
+            error: result?.error
+          });
+          
           if (result?.success && isMounted) {
-            console.log('Authorization code exchange successful');
+            console.log('AuthCallback: Code exchange successful, setting success status');
             setStatus('success');
             
             // Redirect to home dashboard after successful authentication
             setTimeout(() => {
               if (isMounted) {
+                console.log('AuthCallback: Redirecting to home dashboard');
                 navigate('/home-dashboard', { replace: true });
               }
             }, 2000);
           } else if (isMounted) {
-            console.log('Authorization code exchange failed:', result?.error);
-            setError(result?.error || 'Failed to process authentication. Please try again.');
+            console.log('AuthCallback: Code exchange failed:', result?.error);
+            
+            // Handle specific error types
+            let errorMessage = result?.error || 'Failed to process authentication. Please try again.';
+            
+            // Check for specific Supabase errors
+            if (result?.error?.includes('expired') || result?.error?.includes('otp_expired')) {
+              errorMessage = 'Your verification link has expired. Please request a new one.';
+            } else if (result?.error?.includes('invalid') || result?.error?.includes('code')) {
+              errorMessage = 'Invalid verification link. Please try signing up again.';
+            }
+            
+            setError(errorMessage);
             setStatus('error');
           }
         } else {
           // No code or error found - redirect to login
           if (isMounted) {
-            console.log('No authorization code found, redirecting to login');
+            console.log('AuthCallback: No authorization code found, redirecting to login');
             navigate('/login-screen', { replace: true });
           }
         }
       } catch (error) {
-        console.log('Auth callback processing error:', error);
+        console.log('AuthCallback: Processing error:', error);
         if (isMounted) {
           setError('Something went wrong processing your authentication. Please try again.');
           setStatus('error');
@@ -87,10 +117,12 @@ export function AuthCallback() {
   }, [location.search, navigate]);
 
   const handleRetry = () => {
+    console.log('AuthCallback: User clicked retry, redirecting to registration');
     navigate('/registration-screen', { replace: true });
   };
 
   const handleLoginRedirect = () => {
+    console.log('AuthCallback: User clicked login, redirecting to login');
     navigate('/login-screen', { replace: true });
   };
 
@@ -175,8 +207,14 @@ export function AuthProvider({ children }) {
       try {
         setLoading(true);
         setAuthError(null);
+        console.log('AuthProvider: Initializing authentication state');
 
         const sessionResult = await authService.getSession();
+        console.log('AuthProvider: Session result:', {
+          success: sessionResult?.success,
+          hasSession: !!sessionResult?.data?.session,
+          hasUser: !!sessionResult?.data?.session?.user
+        });
 
         if (
           sessionResult?.success &&
@@ -185,30 +223,44 @@ export function AuthProvider({ children }) {
         ) {
           const authUser = sessionResult.data.session.user;
           setUser(authUser);
+          console.log('AuthProvider: User set from session:', authUser.id);
 
           // Fetch user profile
+          console.log('AuthProvider: Fetching user profile');
           const profileResult = await authService.getUserProfile(authUser.id);
 
           if (profileResult?.success && isMounted) {
             setUserProfile(profileResult.data);
+            console.log('AuthProvider: User profile loaded:', {
+              email: profileResult.data?.email,
+              tier: profileResult.data?.tier
+            });
             
             // Exchange for JWT token with profile data
+            console.log('AuthProvider: Exchanging for JWT token');
             const jwtResult = await authService.exchangeForJWT();
             if (jwtResult?.success && isMounted) {
               setJwtToken(jwtResult.data);
+              console.log('AuthProvider: JWT token set successfully');
+            } else {
+              console.log('AuthProvider: JWT exchange failed:', jwtResult?.error);
             }
           } else if (isMounted) {
+            console.log('AuthProvider: Failed to load user profile:', profileResult?.error);
             setAuthError(profileResult?.error || "Failed to load user profile");
           }
+        } else {
+          console.log('AuthProvider: No valid session found');
         }
       } catch (error) {
         if (isMounted) {
+          console.log('AuthProvider: Auth initialization error:', error);
           setAuthError("Failed to initialize authentication");
-          console.log("Auth initialization error:", error);
         }
       } finally {
         if (isMounted) {
           setLoading(false);
+          console.log('AuthProvider: Authentication initialization complete');
         }
       }
     };
@@ -221,37 +273,45 @@ export function AuthProvider({ children }) {
     } = authService.onAuthStateChange(async (event, session) => {
       if (!isMounted) return;
 
+      console.log('AuthProvider: Auth state changed:', { event, hasSession: !!session });
       setAuthError(null);
 
       if (event === "SIGNED_IN" && session?.user) {
         setUser(session.user);
+        console.log('AuthProvider: User signed in:', session.user.id);
 
         // Fetch user profile for signed in user
         authService.getUserProfile(session.user.id).then((profileResult) => {
           if (profileResult?.success && isMounted) {
             setUserProfile(profileResult.data);
+            console.log('AuthProvider: Profile loaded after sign in');
             
             // Exchange for JWT token
             authService.exchangeForJWT().then((jwtResult) => {
               if (jwtResult?.success && isMounted) {
                 setJwtToken(jwtResult.data);
+                console.log('AuthProvider: JWT token obtained after sign in');
               }
             });
           } else if (isMounted) {
+            console.log('AuthProvider: Profile load failed after sign in:', profileResult?.error);
             setAuthError(profileResult?.error || "Failed to load user profile");
           }
         });
       } else if (event === "SIGNED_OUT") {
+        console.log('AuthProvider: User signed out, clearing state');
         setUser(null);
         setUserProfile(null);
         setJwtToken(null);
       } else if (event === "TOKEN_REFRESHED" && session?.user) {
         setUser(session.user);
+        console.log('AuthProvider: Token refreshed for user:', session.user.id);
         
         // Refresh JWT token when Supabase token refreshes
         authService.refreshJWT().then((jwtResult) => {
           if (jwtResult?.success && isMounted) {
             setJwtToken(jwtResult.data);
+            console.log('AuthProvider: JWT token refreshed');
           }
         });
       }
@@ -267,18 +327,21 @@ export function AuthProvider({ children }) {
   const signIn = async (email, password) => {
     try {
       setAuthError(null);
+      console.log('AuthProvider: Starting sign in for:', email);
       const result = await authService.signIn(email, password);
 
       if (!result?.success) {
+        console.log('AuthProvider: Sign in failed:', result?.error);
         setAuthError(result?.error || "Login failed");
         return { success: false, error: result?.error };
       }
 
+      console.log('AuthProvider: Sign in successful');
       return { success: true, data: result.data };
     } catch (error) {
       const errorMsg = "Something went wrong during login. Please try again.";
+      console.log('AuthProvider: Sign in exception:', error);
       setAuthError(errorMsg);
-      console.log("Sign in error:", error);
       return { success: false, error: errorMsg };
     }
   };
@@ -287,18 +350,21 @@ export function AuthProvider({ children }) {
   const signUp = async (email, password, userData = {}) => {
     try {
       setAuthError(null);
+      console.log('AuthProvider: Starting sign up for:', email);
       const result = await authService.signUp(email, password, userData);
 
       if (!result?.success) {
+        console.log('AuthProvider: Sign up failed:', result?.error);
         setAuthError(result?.error || "Signup failed");
         return { success: false, error: result?.error };
       }
 
+      console.log('AuthProvider: Sign up successful');
       return { success: true, data: result.data };
     } catch (error) {
       const errorMsg = "Something went wrong during signup. Please try again.";
+      console.log('AuthProvider: Sign up exception:', error);
       setAuthError(errorMsg);
-      console.log("Sign up error:", error);
       return { success: false, error: errorMsg };
     }
   };
@@ -307,18 +373,21 @@ export function AuthProvider({ children }) {
   const signOut = async () => {
     try {
       setAuthError(null);
+      console.log('AuthProvider: Starting sign out');
       const result = await authService.signOut();
 
       if (!result?.success) {
+        console.log('AuthProvider: Sign out failed:', result?.error);
         setAuthError(result?.error || "Logout failed");
         return { success: false, error: result?.error };
       }
 
+      console.log('AuthProvider: Sign out successful');
       return { success: true };
     } catch (error) {
       const errorMsg = "Something went wrong during logout. Please try again.";
+      console.log('AuthProvider: Sign out exception:', error);
       setAuthError(errorMsg);
-      console.log("Sign out error:", error);
       return { success: false, error: errorMsg };
     }
   };
@@ -334,14 +403,17 @@ export function AuthProvider({ children }) {
         return { success: false, error: errorMsg };
       }
 
+      console.log('AuthProvider: Updating profile for user:', user.id);
       const result = await authService.updateUserProfile(user.id, updates);
 
       if (!result?.success) {
+        console.log('AuthProvider: Profile update failed:', result?.error);
         setAuthError(result?.error || "Profile update failed");
         return { success: false, error: result?.error };
       }
 
       setUserProfile(result.data);
+      console.log('AuthProvider: Profile updated successfully');
       
       // JWT is automatically refreshed in the service
       const updatedJWT = authService.getCurrentJWT();
@@ -351,10 +423,9 @@ export function AuthProvider({ children }) {
       
       return { success: true, data: result.data };
     } catch (error) {
-      const errorMsg =
-        "Something went wrong updating profile. Please try again.";
+      const errorMsg = "Something went wrong updating profile. Please try again.";
+      console.log('AuthProvider: Profile update exception:', error);
       setAuthError(errorMsg);
-      console.log("Update profile error:", error);
       return { success: false, error: errorMsg };
     }
   };
@@ -363,19 +434,21 @@ export function AuthProvider({ children }) {
   const resetPassword = async (email) => {
     try {
       setAuthError(null);
+      console.log('AuthProvider: Resetting password for:', email);
       const result = await authService.resetPassword(email);
 
       if (!result?.success) {
+        console.log('AuthProvider: Password reset failed:', result?.error);
         setAuthError(result?.error || "Password reset failed");
         return { success: false, error: result?.error };
       }
 
+      console.log('AuthProvider: Password reset successful');
       return { success: true };
     } catch (error) {
-      const errorMsg =
-        "Something went wrong sending reset email. Please try again.";
+      const errorMsg = "Something went wrong sending reset email. Please try again.";
+      console.log('AuthProvider: Password reset exception:', error);
       setAuthError(errorMsg);
-      console.log("Reset password error:", error);
       return { success: false, error: errorMsg };
     }
   };
@@ -384,19 +457,22 @@ export function AuthProvider({ children }) {
   const exchangeJWT = async (customClaims = {}) => {
     try {
       setAuthError(null);
+      console.log('AuthProvider: Exchanging for JWT token');
       const result = await authService.exchangeForJWT(customClaims);
 
       if (!result?.success) {
+        console.log('AuthProvider: JWT exchange failed:', result?.error);
         setAuthError(result?.error || "JWT exchange failed");
         return { success: false, error: result?.error };
       }
 
       setJwtToken(result.data);
+      console.log('AuthProvider: JWT exchange successful');
       return { success: true, data: result.data };
     } catch (error) {
       const errorMsg = "Something went wrong exchanging JWT token. Please try again.";
+      console.log('AuthProvider: JWT exchange exception:', error);
       setAuthError(errorMsg);
-      console.log("JWT exchange error:", error);
       return { success: false, error: errorMsg };
     }
   };
@@ -417,7 +493,7 @@ export function AuthProvider({ children }) {
     } catch (error) {
       const errorMsg = "Something went wrong refreshing JWT token. Please try again.";
       setAuthError(errorMsg);
-      console.log("JWT refresh error:", error);
+      console.log("AuthProvider: JWT refresh exception:", error);
       return { success: false, error: errorMsg };
     }
   };
@@ -437,7 +513,7 @@ export function AuthProvider({ children }) {
     } catch (error) {
       const errorMsg = "Something went wrong validating JWT token. Please try again.";
       setAuthError(errorMsg);
-      console.log("JWT validation error:", error);
+      console.log("AuthProvider: JWT validation exception:", error);
       return { success: false, error: errorMsg };
     }
   };
@@ -446,18 +522,21 @@ export function AuthProvider({ children }) {
   const handleAuthCallback = async (code) => {
     try {
       setAuthError(null);
+      console.log('AuthProvider: Handling auth callback with code');
       const result = await authService.exchangeCodeForSession(code);
 
       if (!result?.success) {
+        console.log('AuthProvider: Auth callback failed:', result?.error);
         setAuthError(result?.error || "Authentication callback failed");
         return { success: false, error: result?.error };
       }
 
+      console.log('AuthProvider: Auth callback successful');
       return { success: true, data: result.data };
     } catch (error) {
       const errorMsg = "Something went wrong processing authentication callback.";
+      console.log('AuthProvider: Auth callback exception:', error);
       setAuthError(errorMsg);
-      console.log("Auth callback error:", error);
       return { success: false, error: errorMsg };
     }
   };

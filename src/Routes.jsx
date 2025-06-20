@@ -7,7 +7,7 @@ import RouteTransition from "components/RouteTransition";
 import Header from "components/ui/Header";
 import GlobalSearchFilter from "components/ui/GlobalSearchFilter";
 import { AuthCallback } from "context/AuthContext";
-import { useGoogleAnalytics } from 'hooks/useGoogleAnalytics';
+import useGoogleAnalytics from 'hooks/useGoogleAnalytics';
 import HomeDashboard from "pages/home-dashboard";
 import PollingInterface from "pages/polling-interface";
 import SubscriptionManagement from "pages/subscription-management";
@@ -18,6 +18,8 @@ import LoginScreen from "pages/login-screen";
 import RegistrationScreen from "pages/registration-screen";
 import AdminDashboard from "pages/admin-dashboard";
 import AuthenticationSetupGuide from "pages/authentication-setup-guide";
+import AuthenticationCallbackHandler from "pages/authentication-callback-handler";
+import DeveloperAuthenticationGuide from "pages/developer-authentication-guide";
 
 import NotFoundErrorPage from "pages/404-error-page";
 
@@ -61,10 +63,18 @@ const RouteErrorBoundary = ({ error }) => {
   );
 };
 
+// AuthCallbackWrapper to handle URL patterns
+const AuthCallbackWrapper = () => {
+  console.log('AuthCallbackWrapper: Rendering callback handler');
+  console.log('AuthCallbackWrapper: Current URL:', window.location.href);
+  return <AuthCallback />;
+};
+
 const AppRoutes = () => {
   return (
     <BrowserRouter>
       <Routes>
+        {/* Main application routes */}
         <Route path="/" element={<RootLayout />}>
           <Route index element={<HomeDashboard />} />
           <Route path="home-dashboard" element={<HomeDashboard />} />
@@ -77,16 +87,23 @@ const AppRoutes = () => {
           <Route path="registration-screen" element={<RegistrationScreen />} />
           <Route path="admin-dashboard" element={<AdminDashboard />} />
           <Route path="authentication-setup-guide" element={<AuthenticationSetupGuide />} />
+          <Route path="authentication-callback-handler" element={<AuthenticationCallbackHandler />} />
+          <Route path="developer-authentication-guide" element={<DeveloperAuthenticationGuide />} />
         </Route>
         
-        {/* Authentication callback routes */}
-
-        {/* Handle callback URLs with query parameters */}
-
+        {/* Enhanced authentication callback routes - these handle the magic link flow */}
+        {/* Standard auth callback routes */}
+        <Route path="/auth/callback" element={<AuthCallbackWrapper />} />
+        <Route path="/auth/confirm" element={<AuthCallbackWrapper />} />
+        
+        {/* Root-level callback routes for magic links */}
+        {/* These handle URLs like /?code=abc123 or /?error=expired */}
+        <Route path="/" element={<AuthCallbackWrapper />} />
+        
         {/* New dedicated 404 error page route */}
         <Route path="/404-error-page" element={<NotFoundErrorPage />} />
         
-        {/* Catch-all route now uses the enhanced 404 page */}
+        {/* Catch-all route uses the enhanced 404 page */}
         <Route path="*" element={<NotFoundErrorPage />} />
       </Routes>
     </BrowserRouter>
