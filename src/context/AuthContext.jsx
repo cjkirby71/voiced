@@ -1,8 +1,164 @@
 // src/context/AuthContext.jsx
 import React, { createContext, useContext, useEffect, useState } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
 import authService from "../utils/authService";
 
 const AuthContext = createContext();
+
+// AuthCallback component to handle authentication redirects
+export function AuthCallback() {
+  const [status, setStatus] = useState('processing');
+  const [error, setError] = useState(null);
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const handleAuthCallback = async () => {
+      try {
+        const urlParams = new URLSearchParams(location.search);
+        const code = urlParams.get('code');
+        const error = urlParams.get('error');
+        const errorCode = urlParams.get('error_code');
+        const errorDescription = urlParams.get('error_description');
+
+        // Handle error cases first
+        if (error) {
+          let userMessage = 'Authentication failed. Please try again.';
+          
+          if (errorCode === 'otp_expired' || error === 'access_denied') {
+            userMessage = 'Your verification link has expired. Please sign up again to receive a new link.';
+          } else if (errorDescription) {
+            userMessage = decodeURIComponent(errorDescription.replace(/\+/g, ' '));
+          }
+          
+          console.log('Auth callback error:', { error, errorCode, errorDescription });
+          
+          if (isMounted) {
+            setError(userMessage);
+            setStatus('error');
+          }
+          return;
+        }
+
+        // Handle successful code exchange
+        if (code) {
+          console.log('Processing authorization code...');
+          
+          const result = await authService.exchangeCodeForSession(code);
+          
+          if (result?.success && isMounted) {
+            console.log('Authorization code exchange successful');
+            setStatus('success');
+            
+            // Redirect to home dashboard after successful authentication
+            setTimeout(() => {
+              if (isMounted) {
+                navigate('/home-dashboard', { replace: true });
+              }
+            }, 2000);
+          } else if (isMounted) {
+            console.log('Authorization code exchange failed:', result?.error);
+            setError(result?.error || 'Failed to process authentication. Please try again.');
+            setStatus('error');
+          }
+        } else {
+          // No code or error found - redirect to login
+          if (isMounted) {
+            console.log('No authorization code found, redirecting to login');
+            navigate('/login-screen', { replace: true });
+          }
+        }
+      } catch (error) {
+        console.log('Auth callback processing error:', error);
+        if (isMounted) {
+          setError('Something went wrong processing your authentication. Please try again.');
+          setStatus('error');
+        }
+      }
+    };
+
+    handleAuthCallback();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [location.search, navigate]);
+
+  const handleRetry = () => {
+    navigate('/registration-screen', { replace: true });
+  };
+
+  const handleLoginRedirect = () => {
+    navigate('/login-screen', { replace: true });
+  };
+
+  if (status === 'processing') {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+          <h2 className="text-xl font-semibold text-text-primary mb-2">Processing Authentication</h2>
+          <p className="text-text-secondary">Please wait while we verify your account...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (status === 'success') {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="text-center">
+          <div className="w-12 h-12 bg-green-500 rounded-full flex items-center justify-center mx-auto mb-4">
+            <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+            </svg>
+          </div>
+          <h2 className="text-xl font-semibold text-text-primary mb-2">Authentication Successful!</h2>
+          <p className="text-text-secondary mb-4">Redirecting you to your dashboard...</p>
+          <div className="w-48 bg-gray-200 rounded-full h-2 mx-auto">
+            <div className="bg-primary h-2 rounded-full animate-pulse w-3/4"></div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (status === 'error') {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="max-w-md w-full mx-4">
+          <div className="bg-white rounded-lg shadow-lg p-6 text-center">
+            <div className="w-12 h-12 bg-red-500 rounded-full flex items-center justify-center mx-auto mb-4">
+              <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </div>
+            <h2 className="text-xl font-semibold text-text-primary mb-2">Authentication Failed</h2>
+            <p className="text-text-secondary mb-6">{error}</p>
+            <div className="flex flex-col sm:flex-row gap-3 justify-center">
+              <button
+                onClick={handleRetry}
+                className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-600 transition-colors duration-200"
+              >
+                Try Sign Up Again
+              </button>
+              <button
+                onClick={handleLoginRedirect}
+                className="px-4 py-2 border border-gray-300 text-text-primary rounded-lg hover:bg-gray-50 transition-colors duration-200"
+              >
+                Go to Login
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return null;
+}
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
@@ -286,6 +442,26 @@ export function AuthProvider({ children }) {
     }
   };
 
+  // Handle authorization code callback
+  const handleAuthCallback = async (code) => {
+    try {
+      setAuthError(null);
+      const result = await authService.exchangeCodeForSession(code);
+
+      if (!result?.success) {
+        setAuthError(result?.error || "Authentication callback failed");
+        return { success: false, error: result?.error };
+      }
+
+      return { success: true, data: result.data };
+    } catch (error) {
+      const errorMsg = "Something went wrong processing authentication callback.";
+      setAuthError(errorMsg);
+      console.log("Auth callback error:", error);
+      return { success: false, error: errorMsg };
+    }
+  };
+
   const value = {
     user,
     userProfile,
@@ -300,6 +476,7 @@ export function AuthProvider({ children }) {
     exchangeJWT,
     refreshJWT,
     validateJWT,
+    handleAuthCallback,
     clearError: () => setAuthError(null),
   };
 

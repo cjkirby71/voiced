@@ -1,5 +1,5 @@
 // src/utils/authService.js
-import { supabase } from './supabaseClient';
+import supabase from './supabaseClient';
 import { authHelpers, dbHelpers } from './supabaseClient';
 import errorRecoveryManager, { withErrorRecovery } from './errorRecovery';
 import { debugLogger } from './debugUtils';
@@ -174,6 +174,76 @@ class AuthService {
       this.log('error', 'GetSession service exception', error);
       return { success: false, error: 'Failed to get session.' };
     }
+  }
+
+  // Exchange authorization code for session (for magic link callbacks)
+  async exchangeCodeForSession(code) {
+    return withErrorRecovery(async () => {
+      this.log('info', 'Exchanging authorization code for session', { code: code?.substring(0, 10) + '...' });
+      
+      try {
+        const { data, error } = await supabase.auth.exchangeCodeForSession(code);
+
+        if (error) {
+          this.log('error', 'Code exchange failed', error);
+          return { success: false, error: error.message };
+        }
+
+        if (data?.user) {
+          this.currentUser = data.user;
+          this.log('info', 'Code exchange successful', { userId: data.user.id });
+          
+          // Fetch user profile
+          const profileResult = await this.getUserProfile(data.user.id);
+          if (profileResult?.success) {
+            this.log('info', 'User profile fetched after code exchange');
+          }
+          
+          // Exchange for JWT token using the edge function
+          const jwtResult = await this.exchangeCodeForJWT(code);
+          if (jwtResult?.success) {
+            this.currentJWT = jwtResult.data;
+            this.log('info', 'JWT exchange successful after code exchange');
+          } else {
+            this.log('warn', 'JWT exchange failed after code exchange', jwtResult?.error);
+          }
+        }
+
+        return { success: true, data };
+      } catch (error) {
+        this.log('error', 'ExchangeCodeForSession service exception', error);
+        return { success: false, error: 'Failed to exchange authorization code.' };
+      }
+    }, { operation: 'exchangeCodeForSession', code: code?.substring(0, 10) + '...' })();
+  }
+
+  // Exchange authorization code for JWT token (new method)
+  async exchangeCodeForJWT(authorizationCode, customClaims = {}) {
+    return withErrorRecovery(async () => {
+      this.log('info', 'Exchanging authorization code for JWT token');
+      
+      try {
+        const { data, error } = await supabase.functions.invoke('jwt-exchange', {
+          body: {
+            authorization_code: authorizationCode,
+            custom_claims: customClaims,
+            exchange_type: 'authorization_code'
+          }
+        });
+
+        if (error) {
+          this.log('error', 'JWT code exchange failed', error);
+          return { success: false, error: error.message };
+        }
+
+        this.currentJWT = data;
+        this.log('info', 'JWT code exchange successful');
+        return { success: true, data };
+      } catch (error) {
+        this.log('error', 'ExchangeCodeForJWT service exception', error);
+        return { success: false, error: 'Failed to exchange authorization code for JWT.' };
+      }
+    }, { operation: 'exchangeCodeForJWT' })();
   }
 
   // Enhanced JWT exchange with detailed error handling

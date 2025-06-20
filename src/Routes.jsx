@@ -6,7 +6,8 @@ import ErrorBoundary from "components/ErrorBoundary";
 import RouteTransition from "components/RouteTransition";
 import Header from "components/ui/Header";
 import GlobalSearchFilter from "components/ui/GlobalSearchFilter";
-import useGoogleAnalytics from 'hooks/useGoogleAnalytics';
+import { AuthCallback } from "context/AuthContext";
+import { useGoogleAnalytics } from 'hooks/useGoogleAnalytics';
 import HomeDashboard from "pages/home-dashboard";
 import PollingInterface from "pages/polling-interface";
 import SubscriptionManagement from "pages/subscription-management";
@@ -77,8 +78,14 @@ const AppRoutes = () => {
           <Route path="admin-dashboard" element={<AdminDashboard />} />
           <Route path="authentication-setup-guide" element={<AuthenticationSetupGuide />} />
         </Route>
+        
+        {/* Authentication callback routes */}
+
+        {/* Handle callback URLs with query parameters */}
+
         {/* New dedicated 404 error page route */}
         <Route path="/404-error-page" element={<NotFoundErrorPage />} />
+        
         {/* Catch-all route now uses the enhanced 404 page */}
         <Route path="*" element={<NotFoundErrorPage />} />
       </Routes>

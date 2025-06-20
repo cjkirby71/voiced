@@ -9,8 +9,9 @@ const corsHeaders = {
 };
 
 interface JWTExchangeRequest {
-  current_token: string;
-  refresh_token: string;
+  current_token?: string;
+  refresh_token?: string;
+  authorization_code?: string;
   custom_claims: Record<string, any>;
   exchange_type: string;
 }
@@ -19,6 +20,7 @@ interface JWTExchangeResponse {
   jwt_token: string;
   expires_at: number;
   token_type: string;
+  session?: any;
 }
 
 serve(async (req) => {
@@ -44,13 +46,14 @@ serve(async (req) => {
     const {
       current_token,
       refresh_token,
+      authorization_code,
       custom_claims,
       exchange_type
     }: JWTExchangeRequest = await req.json();
 
-    if (!current_token || !exchange_type) {
+    if (!exchange_type) {
       return new Response(
-        JSON.stringify({ error: "Missing required parameters" }),
+        JSON.stringify({ error: "Missing exchange_type parameter" }),
         {
           status: 400,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -58,12 +61,69 @@ serve(async (req) => {
       );
     }
 
-    // Verify the current Supabase token
-    const { data: { user }, error: userError } = await supabaseClient.auth.getUser(current_token);
-    
-    if (userError || !user) {
+    let user = null;
+    let session = null;
+
+    // Handle different exchange types
+    if (exchange_type === "authorization_code" && authorization_code) {
+      console.log("Exchanging authorization code for session");
+      
+      // Exchange authorization code for session
+      const { data, error } = await supabaseClient.auth.exchangeCodeForSession(authorization_code);
+      
+      if (error) {
+        console.error("Code exchange error:", error);
+        return new Response(
+          JSON.stringify({ 
+            error: "Failed to exchange authorization code",
+            message: error.message,
+            code: error.name || "code_exchange_failed"
+          }),
+          {
+            status: 400,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          }
+        );
+      }
+
+      user = data.user;
+      session = data.session;
+      console.log("Code exchange successful for user:", user?.id);
+      
+    } else if (exchange_type === "custom_jwt" && current_token) {
+      console.log("Validating current token for JWT exchange");
+      
+      // Verify the current Supabase token
+      const { data: { user: authUser }, error: userError } = await supabaseClient.auth.getUser(current_token);
+      
+      if (userError || !authUser) {
+        return new Response(
+          JSON.stringify({ error: "Invalid or expired token" }),
+          {
+            status: 401,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          }
+        );
+      }
+
+      user = authUser;
+      
+    } else {
       return new Response(
-        JSON.stringify({ error: "Invalid or expired token" }),
+        JSON.stringify({ 
+          error: "Invalid exchange type or missing required parameters",
+          details: "For authorization_code: provide authorization_code. For custom_jwt: provide current_token."
+        }),
+        {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
+    }
+
+    if (!user) {
+      return new Response(
+        JSON.stringify({ error: "No user found in exchange process" }),
         {
           status: 401,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -101,7 +161,7 @@ serve(async (req) => {
       
       // Token metadata
       token_type: exchange_type,
-      original_token_id: current_token.substring(0, 10) + "..."
+      exchange_source: authorization_code ? "authorization_code" : "current_token"
     };
 
     // Create the JWT
@@ -121,7 +181,8 @@ serve(async (req) => {
     const response: JWTExchangeResponse = {
       jwt_token: jwt,
       expires_at: expiresAt,
-      token_type: exchange_type
+      token_type: exchange_type,
+      ...(session && { session: session })
     };
 
     return new Response(JSON.stringify(response), {

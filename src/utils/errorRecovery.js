@@ -1,6 +1,6 @@
 // src/utils/errorRecovery.js
 // Error recovery utilities for authentication issues
-import { supabase } from './supabaseClient';
+import supabase from './supabaseClient';
 import authService from './authService';
 import { debugLogger } from './debugUtils';
 

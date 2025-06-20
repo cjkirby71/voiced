@@ -1,6 +1,6 @@
 // src/utils/debugUtils.js
 // Debug utilities for authentication troubleshooting
-import { supabase } from './supabaseClient';
+import supabase from './supabaseClient';
 import authService from './authService';
 
 // Debug configuration
