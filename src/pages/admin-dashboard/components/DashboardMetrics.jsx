@@ -100,7 +100,7 @@ const DashboardMetrics = ({ metrics }) => {
             </div>
             <div>
               <p className="text-2xl font-bold text-text-primary mb-1">
-                {typeof metric?.value === 'number' ? metric?.value?.toLocaleString() : metric?.value}
+                {typeof metric?.value === 'number' && metric?.value !== null ? metric?.value?.toLocaleString() : metric?.value || '0'}
               </p>
               <p className="text-text-secondary text-sm">{metric?.title}</p>
             </div>
@@ -151,7 +151,7 @@ const DashboardMetrics = ({ metrics }) => {
               </Pie>
               <Tooltip 
                 formatter={(value, name, props) => [
-                  `${value}% (${props?.payload?.count?.toLocaleString()} users)`,
+                  `${value}% (${props?.payload?.count?.toLocaleString() || '0'} users)`,
                   name
                 ]}
                 contentStyle={{ 

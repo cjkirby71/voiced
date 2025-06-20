@@ -5,6 +5,7 @@ import ScrollToTop from "components/ScrollToTop";
 import ErrorBoundary from "components/ErrorBoundary";
 import Header from "components/ui/Header";
 import GlobalSearchFilter from "components/ui/GlobalSearchFilter";
+import useGoogleAnalytics from 'hooks/useGoogleAnalytics';
 import HomeDashboard from "pages/home-dashboard";
 import PollingInterface from "pages/polling-interface";
 import SubscriptionManagement from "pages/subscription-management";
@@ -19,6 +20,9 @@ import NotFoundErrorPage from "pages/404-error-page";
 
 // Root Layout Component
 const RootLayout = () => {
+  // Initialize Google Analytics
+  useGoogleAnalytics();
+
   return (
     <ErrorBoundary>
       <ScrollToTop />

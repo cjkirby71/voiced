@@ -118,11 +118,11 @@ const RecentPolls = ({ userTier }) => {
                 <div className="flex items-center space-x-4 text-xs text-text-muted">
                   <div className="flex items-center space-x-1">
                     <Icon name="Users" size={14} />
-                    <span>{poll.participants.toLocaleString()} participants</span>
+                    <span>{poll?.participants?.toLocaleString() || '0'} participants</span>
                   </div>
                   <div className="flex items-center space-x-1">
                     <Icon name="Clock" size={14} />
-                    <span>{poll.timeRemaining} left</span>
+                    <span>{poll?.timeRemaining || 'N/A'} left</span>
                   </div>
                 </div>
 
