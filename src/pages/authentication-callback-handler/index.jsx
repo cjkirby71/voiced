@@ -1,13 +1,14 @@
 // src/pages/authentication-callback-handler/index.jsx
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import authService from '../../utils/authService';
+import { useAuth } from '../../context/AuthContext';
 import AppIcon from '../../components/AppIcon';
 
 const AuthenticationCallbackHandler = () => {
   const [status, setStatus] = useState('processing');
   const [error, setError] = useState(null);
   const [progress, setProgress] = useState(0);
+  const { exchangeCodeForSession } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -58,7 +59,7 @@ const AuthenticationCallbackHandler = () => {
           setProgress(50);
           
           // Exchange code for session using the enhanced function
-          const result = await authService.exchangeCodeForSession(code);
+          const result = await exchangeCodeForSession(code);
           
           if (result?.success && isMounted) {
             console.log('Authorization code exchange successful');
@@ -104,7 +105,7 @@ const AuthenticationCallbackHandler = () => {
         clearInterval(progressInterval);
       }
     };
-  }, [location.search, navigate]);
+  }, [location.search, navigate, exchangeCodeForSession]);
 
   const handleRetry = () => {
     navigate('/registration-screen', { replace: true });

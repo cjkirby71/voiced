@@ -9,7 +9,7 @@ const RegistrationForm = ({
   onShowTerms, 
   onShowPrivacy 
 }) => {
-  const { signUp, authError, clearError } = useAuth();
+  const { signUp, error: authError, clearError } = useAuth();
   const [formData, setFormData] = useState({
     fullName: '',
     email: '',
@@ -32,11 +32,11 @@ const RegistrationForm = ({
 
   const calculatePasswordStrength = (password) => {
     let strength = 0;
-    if (password.length >= 8) strength += 1;
-    if (/[A-Z]/.test(password)) strength += 1;
-    if (/[a-z]/.test(password)) strength += 1;
-    if (/[0-9]/.test(password)) strength += 1;
-    if (/[^A-Za-z0-9]/.test(password)) strength += 1;
+    if (password?.length >= 8) strength += 1;
+    if (/[A-Z]/.test(password || '')) strength += 1;
+    if (/[a-z]/.test(password || '')) strength += 1;
+    if (/[0-9]/.test(password || '')) strength += 1;
+    if (/[^A-Za-z0-9]/.test(password || '')) strength += 1;
     return strength;
   };
 
@@ -59,27 +59,27 @@ const RegistrationForm = ({
   const validateStep1 = () => {
     const newErrors = {};
     
-    if (!formData.fullName.trim()) {
+    if (!formData?.fullName?.trim()) {
       newErrors.fullName = 'Full name is required';
-    } else if (formData.fullName.trim().length < 2) {
+    } else if (formData?.fullName?.trim()?.length < 2) {
       newErrors.fullName = 'Full name must be at least 2 characters';
     }
     
-    if (!formData.email) {
+    if (!formData?.email) {
       newErrors.email = 'Email is required';
-    } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
+    } else if (!/\S+@\S+\.\S+/.test(formData?.email || '')) {
       newErrors.email = 'Please enter a valid email address';
     }
     
-    if (!formData.password) {
+    if (!formData?.password) {
       newErrors.password = 'Password is required';
-    } else if (formData.password.length < 6) {
+    } else if ((formData?.password?.length || 0) < 6) {
       newErrors.password = 'Password must be at least 6 characters';
     }
     
-    if (!formData.confirmPassword) {
+    if (!formData?.confirmPassword) {
       newErrors.confirmPassword = 'Please confirm your password';
-    } else if (formData.password !== formData.confirmPassword) {
+    } else if (formData?.password !== formData?.confirmPassword) {
       newErrors.confirmPassword = 'Passwords do not match';
     }
     
@@ -90,21 +90,21 @@ const RegistrationForm = ({
   const validateStep2 = () => {
     const newErrors = {};
     
-    if (!formData.zipCode) {
+    if (!formData?.zipCode) {
       newErrors.zipCode = 'ZIP code is required for representative matching';
-    } else if (!/^\d{5}(-\d{4})?$/.test(formData.zipCode)) {
+    } else if (!/^\d{5}(-\d{4})?$/.test(formData?.zipCode || '')) {
       newErrors.zipCode = 'Please enter a valid ZIP code';
     }
     
-    if (formData.phoneNumber && !/^[\+]?[1-9][\d]{0,14}$/.test(formData.phoneNumber.replace(/[\s\-\(\)]/g, ''))) {
+    if (formData?.phoneNumber && !/^[\+]?[1-9][\d]{0,14}$/.test((formData?.phoneNumber || '').replace(/[\s\-\(\)]/g, ''))) {
       newErrors.phoneNumber = 'Please enter a valid phone number';
     }
     
-    if (!formData.termsAccepted) {
+    if (!formData?.termsAccepted) {
       newErrors.termsAccepted = 'You must accept the Terms of Service';
     }
     
-    if (!formData.privacyAccepted) {
+    if (!formData?.privacyAccepted) {
       newErrors.privacyAccepted = 'You must accept the Privacy Policy';
     }
     
@@ -121,29 +121,29 @@ const RegistrationForm = ({
     }
     
     // Clear error when user starts typing
-    if (errors[field]) {
+    if (errors?.[field]) {
       setErrors(prev => ({ ...prev, [field]: '' }));
     }
     
     // Clear auth error when user starts typing
     if (authError) {
-      clearError();
+      clearError?.();
     }
   };
 
   const handleNext = () => {
     if (validateStep1()) {
-      setCurrentStep(2);
+      setCurrentStep?.(2);
     }
   };
 
   const handleBack = () => {
-    setCurrentStep(1);
+    setCurrentStep?.(1);
     setErrors({});
   };
 
   const handleSubmit = async (e) => {
-    e.preventDefault();
+    e?.preventDefault();
     
     if (currentStep === 1) {
       handleNext();
@@ -155,28 +155,32 @@ const RegistrationForm = ({
     }
 
     setIsLoading(true);
-    clearError();
+    clearError?.();
 
     try {
-      const result = await signUp(formData.email, formData.password, {
-        fullName: formData.fullName,
-        zipCode: formData.zipCode,
-        phoneNumber: formData.phoneNumber,
-        smsNotifications: formData.smsNotifications,
-        emailNotifications: formData.emailNotifications,
+      const result = await signUp?.(formData?.email, formData?.password, {
+        fullName: formData?.fullName,
+        zipCode: formData?.zipCode,
+        phoneNumber: formData?.phoneNumber,
+        smsNotifications: formData?.smsNotifications,
+        emailNotifications: formData?.emailNotifications,
         tier: 'free' // Default tier for new users
       });
 
-      if (result.success) {
+      if (result?.success) {
         setSignupSuccess(true);
         setSuccessMessage(
-          result.message || 
+          result?.message || 
           'Account created successfully! Please check your email to confirm your account and complete the registration process.'
         );
         console.log('Registration successful');
+      } else {
+        // Handle signup failure
+        setErrors({ general: result?.error || 'Account creation failed. Please try again.' });
       }
     } catch (error) {
       console.log('Registration error:', error);
+      setErrors({ general: error?.message || 'An unexpected error occurred. Please try again.' });
     } finally {
       setIsLoading(false);
     }
@@ -234,7 +238,7 @@ const RegistrationForm = ({
               termsAccepted: false,
               privacyAccepted: false
             });
-            setCurrentStep(1);
+            setCurrentStep?.(1);
           }}
           className="w-full py-3 px-4 bg-primary text-white font-medium rounded-lg hover:bg-primary-700 transition-colors duration-200"
         >
@@ -258,6 +262,16 @@ const RegistrationForm = ({
         </div>
       )}
 
+      {/* Display general errors */}
+      {errors?.general && (
+        <div className="p-4 bg-error-50 border border-error-200 rounded-lg">
+          <p className="text-sm text-error-700 flex items-center space-x-2">
+            <Icon name="AlertCircle" size={16} />
+            <span>{errors.general}</span>
+          </p>
+        </div>
+      )}
+
       {currentStep === 1 && (
         <>
           {/* Full Name */}
@@ -272,16 +286,16 @@ const RegistrationForm = ({
               <input
                 id="fullName"
                 type="text"
-                value={formData.fullName}
-                onChange={(e) => handleInputChange('fullName', e.target.value)}
+                value={formData?.fullName || ''}
+                onChange={(e) => handleInputChange('fullName', e?.target?.value)}
                 className={`block w-full pl-10 pr-3 py-3 border rounded-lg text-text-primary placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all duration-200 ${
-                  errors.fullName ? 'border-error-500 bg-error-50' : 'border-border bg-surface hover:border-border-dark'
+                  errors?.fullName ? 'border-error-500 bg-error-50' : 'border-border bg-surface hover:border-border-dark'
                 }`}
                 placeholder="Enter your full name"
                 disabled={isLoading}
               />
             </div>
-            {errors.fullName && (
+            {errors?.fullName && (
               <p className="mt-2 text-sm text-error-600 flex items-center space-x-1">
                 <Icon name="AlertCircle" size={16} />
                 <span>{errors.fullName}</span>
@@ -301,16 +315,16 @@ const RegistrationForm = ({
               <input
                 id="email"
                 type="email"
-                value={formData.email}
-                onChange={(e) => handleInputChange('email', e.target.value)}
+                value={formData?.email || ''}
+                onChange={(e) => handleInputChange('email', e?.target?.value)}
                 className={`block w-full pl-10 pr-3 py-3 border rounded-lg text-text-primary placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all duration-200 ${
-                  errors.email ? 'border-error-500 bg-error-50' : 'border-border bg-surface hover:border-border-dark'
+                  errors?.email ? 'border-error-500 bg-error-50' : 'border-border bg-surface hover:border-border-dark'
                 }`}
                 placeholder="Enter your email address"
                 disabled={isLoading}
               />
             </div>
-            {errors.email && (
+            {errors?.email && (
               <p className="mt-2 text-sm text-error-600 flex items-center space-x-1">
                 <Icon name="AlertCircle" size={16} />
                 <span>{errors.email}</span>
@@ -330,10 +344,10 @@ const RegistrationForm = ({
               <input
                 id="password"
                 type={showPassword ? 'text' : 'password'}
-                value={formData.password}
-                onChange={(e) => handleInputChange('password', e.target.value)}
+                value={formData?.password || ''}
+                onChange={(e) => handleInputChange('password', e?.target?.value)}
                 className={`block w-full pl-10 pr-12 py-3 border rounded-lg text-text-primary placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all duration-200 ${
-                  errors.password ? 'border-error-500 bg-error-50' : 'border-border bg-surface hover:border-border-dark'
+                  errors?.password ? 'border-error-500 bg-error-50' : 'border-border bg-surface hover:border-border-dark'
                 }`}
                 placeholder="Create a password"
                 disabled={isLoading}
@@ -348,7 +362,7 @@ const RegistrationForm = ({
               </button>
             </div>
             {/* Password Strength Indicator */}
-            {formData.password && (
+            {formData?.password && (
               <div className="mt-2">
                 <div className="flex items-center space-x-2">
                   <div className="flex-1 h-2 bg-secondary-200 rounded-full overflow-hidden">
@@ -360,13 +374,13 @@ const RegistrationForm = ({
                       style={{ width: `${(passwordStrength / 5) * 100}%` }}
                     />
                   </div>
-                  <span className={`text-xs font-medium ${strengthIndicator.color}`}>
-                    {strengthIndicator.text}
+                  <span className={`text-xs font-medium ${strengthIndicator?.color}`}>
+                    {strengthIndicator?.text}
                   </span>
                 </div>
               </div>
             )}
-            {errors.password && (
+            {errors?.password && (
               <p className="mt-2 text-sm text-error-600 flex items-center space-x-1">
                 <Icon name="AlertCircle" size={16} />
                 <span>{errors.password}</span>
@@ -386,10 +400,10 @@ const RegistrationForm = ({
               <input
                 id="confirmPassword"
                 type={showConfirmPassword ? 'text' : 'password'}
-                value={formData.confirmPassword}
-                onChange={(e) => handleInputChange('confirmPassword', e.target.value)}
+                value={formData?.confirmPassword || ''}
+                onChange={(e) => handleInputChange('confirmPassword', e?.target?.value)}
                 className={`block w-full pl-10 pr-12 py-3 border rounded-lg text-text-primary placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all duration-200 ${
-                  errors.confirmPassword ? 'border-error-500 bg-error-50' : 'border-border bg-surface hover:border-border-dark'
+                  errors?.confirmPassword ? 'border-error-500 bg-error-50' : 'border-border bg-surface hover:border-border-dark'
                 }`}
                 placeholder="Confirm your password"
                 disabled={isLoading}
@@ -403,7 +417,7 @@ const RegistrationForm = ({
                 <Icon name={showConfirmPassword ? 'EyeOff' : 'Eye'} size={20} />
               </button>
             </div>
-            {errors.confirmPassword && (
+            {errors?.confirmPassword && (
               <p className="mt-2 text-sm text-error-600 flex items-center space-x-1">
                 <Icon name="AlertCircle" size={16} />
                 <span>{errors.confirmPassword}</span>
@@ -428,16 +442,16 @@ const RegistrationForm = ({
               <input
                 id="zipCode"
                 type="text"
-                value={formData.zipCode}
-                onChange={(e) => handleInputChange('zipCode', e.target.value)}
+                value={formData?.zipCode || ''}
+                onChange={(e) => handleInputChange('zipCode', e?.target?.value)}
                 className={`block w-full pl-10 pr-3 py-3 border rounded-lg text-text-primary placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all duration-200 ${
-                  errors.zipCode ? 'border-error-500 bg-error-50' : 'border-border bg-surface hover:border-border-dark'
+                  errors?.zipCode ? 'border-error-500 bg-error-50' : 'border-border bg-surface hover:border-border-dark'
                 }`}
                 placeholder="12345 or 12345-6789"
                 disabled={isLoading}
               />
             </div>
-            {errors.zipCode && (
+            {errors?.zipCode && (
               <p className="mt-2 text-sm text-error-600 flex items-center space-x-1">
                 <Icon name="AlertCircle" size={16} />
                 <span>{errors.zipCode}</span>
@@ -458,16 +472,16 @@ const RegistrationForm = ({
               <input
                 id="phoneNumber"
                 type="tel"
-                value={formData.phoneNumber}
-                onChange={(e) => handleInputChange('phoneNumber', e.target.value)}
+                value={formData?.phoneNumber || ''}
+                onChange={(e) => handleInputChange('phoneNumber', e?.target?.value)}
                 className={`block w-full pl-10 pr-3 py-3 border rounded-lg text-text-primary placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all duration-200 ${
-                  errors.phoneNumber ? 'border-error-500 bg-error-50' : 'border-border bg-surface hover:border-border-dark'
+                  errors?.phoneNumber ? 'border-error-500 bg-error-50' : 'border-border bg-surface hover:border-border-dark'
                 }`}
                 placeholder="(555) 123-4567"
                 disabled={isLoading}
               />
             </div>
-            {errors.phoneNumber && (
+            {errors?.phoneNumber && (
               <p className="mt-2 text-sm text-error-600 flex items-center space-x-1">
                 <Icon name="AlertCircle" size={16} />
                 <span>{errors.phoneNumber}</span>
@@ -485,8 +499,8 @@ const RegistrationForm = ({
               <label className="flex items-center space-x-3">
                 <input
                   type="checkbox"
-                  checked={formData.emailNotifications}
-                  onChange={(e) => handleInputChange('emailNotifications', e.target.checked)}
+                  checked={formData?.emailNotifications || false}
+                  onChange={(e) => handleInputChange('emailNotifications', e?.target?.checked)}
                   className="w-4 h-4 text-primary border-border rounded focus:ring-primary focus:ring-2"
                   disabled={isLoading}
                 />
@@ -498,8 +512,8 @@ const RegistrationForm = ({
               <label className="flex items-center space-x-3">
                 <input
                   type="checkbox"
-                  checked={formData.smsNotifications}
-                  onChange={(e) => handleInputChange('smsNotifications', e.target.checked)}
+                  checked={formData?.smsNotifications || false}
+                  onChange={(e) => handleInputChange('smsNotifications', e?.target?.checked)}
                   className="w-4 h-4 text-primary border-border rounded focus:ring-primary focus:ring-2"
                   disabled={isLoading}
                 />
@@ -515,10 +529,10 @@ const RegistrationForm = ({
             <label className="flex items-start space-x-3">
               <input
                 type="checkbox"
-                checked={formData.termsAccepted}
-                onChange={(e) => handleInputChange('termsAccepted', e.target.checked)}
+                checked={formData?.termsAccepted || false}
+                onChange={(e) => handleInputChange('termsAccepted', e?.target?.checked)}
                 className={`w-4 h-4 mt-0.5 text-primary border-border rounded focus:ring-primary focus:ring-2 ${
-                  errors.termsAccepted ? 'border-error-500' : ''
+                  errors?.termsAccepted ? 'border-error-500' : ''
                 }`}
                 disabled={isLoading}
               />
@@ -534,7 +548,7 @@ const RegistrationForm = ({
                 {' '}*
               </span>
             </label>
-            {errors.termsAccepted && (
+            {errors?.termsAccepted && (
               <p className="text-sm text-error-600 flex items-center space-x-1 ml-7">
                 <Icon name="AlertCircle" size={16} />
                 <span>{errors.termsAccepted}</span>
@@ -544,10 +558,10 @@ const RegistrationForm = ({
             <label className="flex items-start space-x-3">
               <input
                 type="checkbox"
-                checked={formData.privacyAccepted}
-                onChange={(e) => handleInputChange('privacyAccepted', e.target.checked)}
+                checked={formData?.privacyAccepted || false}
+                onChange={(e) => handleInputChange('privacyAccepted', e?.target?.checked)}
                 className={`w-4 h-4 mt-0.5 text-primary border-border rounded focus:ring-primary focus:ring-2 ${
-                  errors.privacyAccepted ? 'border-error-500' : ''
+                  errors?.privacyAccepted ? 'border-error-500' : ''
                 }`}
                 disabled={isLoading}
               />
@@ -563,7 +577,7 @@ const RegistrationForm = ({
                 {' '}*
               </span>
             </label>
-            {errors.privacyAccepted && (
+            {errors?.privacyAccepted && (
               <p className="text-sm text-error-600 flex items-center space-x-1 ml-7">
                 <Icon name="AlertCircle" size={16} />
                 <span>{errors.privacyAccepted}</span>

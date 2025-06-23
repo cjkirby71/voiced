@@ -65,6 +65,7 @@ class AuthService {
 
         // If signup successful and session exists, exchange for JWT
         if (data?.session) {
+          this.currentUser = data.user;
           this.log('info', 'Session created, attempting JWT exchange');
           const jwtResult = await this.exchangeForJWT();
           if (jwtResult?.success) {
@@ -132,6 +133,36 @@ class AuthService {
         return { success: false, error: 'Login failed. Please try again.' };
       }
     }, { operation: 'signIn', email })();
+  }
+
+  // Sign in with magic link
+  async signInWithMagicLink(email) {
+    return withErrorRecovery(async () => {
+      this.log('info', 'Starting magic link sign in', { email });
+      
+      try {
+        const { data, error } = await supabase.auth.signInWithOtp({
+          email: email,
+          options: {
+            emailRedirectTo: `${window.location.origin}/auth/callback`
+          }
+        });
+
+        if (error) {
+          this.log('error', 'Magic link sign in failed', error);
+          return { success: false, error: error.message };
+        }
+
+        this.log('info', 'Magic link sent successfully');
+        return { 
+          success: true, 
+          message: 'Check your email for a magic link to sign in.' 
+        };
+      } catch (error) {
+        this.log('error', 'SignInWithMagicLink service exception', error);
+        return { success: false, error: 'Failed to send magic link. Please try again.' };
+      }
+    }, { operation: 'signInWithMagicLink', email })();
   }
 
   // Sign out user

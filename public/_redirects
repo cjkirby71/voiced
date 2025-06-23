@@ -1,1 +1,20 @@
+# public/_redirects
+
+# Handle client-side routing for React Router
+/home-dashboard /index.html 200
+/polling-interface /index.html 200
+/subscription-management /index.html 200
+/user-profile-representative-contact /index.html 200
+/community-feedback-hub /index.html 200
+/journalism-hub /index.html 200
+/login-screen /index.html 200
+/registration-screen /index.html 200
+/admin-dashboard /index.html 200
+/authentication-setup-guide /index.html 200
+/authentication-callback-handler /index.html 200
+/developer-authentication-guide /index.html 200
+/auth/* /index.html 200
+/404-error-page /index.html 200
+
+# Fallback for all other routes
 /* /index.html 200

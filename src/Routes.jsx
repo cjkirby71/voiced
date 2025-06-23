@@ -6,7 +6,7 @@ import ErrorBoundary from "components/ErrorBoundary";
 import RouteTransition from "components/RouteTransition";
 import Header from "components/ui/Header";
 import GlobalSearchFilter from "components/ui/GlobalSearchFilter";
-import { AuthCallback } from "context/AuthContext";
+import AuthenticationCallbackHandler from "pages/authentication-callback-handler";
 import { useGoogleAnalytics } from 'hooks/useGoogleAnalytics';
 import HomeDashboard from "pages/home-dashboard";
 import PollingInterface from "pages/polling-interface";
@@ -18,7 +18,6 @@ import LoginScreen from "pages/login-screen";
 import RegistrationScreen from "pages/registration-screen";
 import AdminDashboard from "pages/admin-dashboard";
 import AuthenticationSetupGuide from "pages/authentication-setup-guide";
-import AuthenticationCallbackHandler from "pages/authentication-callback-handler";
 import DeveloperAuthenticationGuide from "pages/developer-authentication-guide";
 
 import NotFoundErrorPage from "pages/404-error-page";
@@ -70,7 +69,7 @@ const HomeWithAuthCallback = () => {
   
   // If URL has auth-related query parameters, show auth callback handler
   if (hasAuthParams) {
-    return <AuthCallback />;
+    return <AuthenticationCallbackHandler />;
   }
   
   // Otherwise show normal home dashboard
@@ -98,8 +97,8 @@ const AppRoutes = () => {
           <Route path="developer-authentication-guide" element={<DeveloperAuthenticationGuide />} />
           
           {/* Dedicated auth callback routes */}
-          <Route path="auth/callback" element={<AuthCallback />} />
-          <Route path="auth/confirm" element={<AuthCallback />} />
+          <Route path="/auth/callback" element={<AuthenticationCallbackHandler />} />
+          <Route path="auth/confirm" element={<AuthenticationCallbackHandler />} />
           
           {/* New dedicated 404 error page route */}
           <Route path="404-error-page" element={<NotFoundErrorPage />} />

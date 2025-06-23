@@ -17,6 +17,42 @@
       gtag('js', new Date());
       gtag('config', 'G-NLR53Z2W90');
     </script>
+    
+    <!-- Error handling for external scripts -->
+    <script>
+      window.addEventListener('error', function(e) {
+        if (e.filename && e.filename.includes('rocket-web.js')) {
+          console.warn('Rocket script error caught and suppressed:', e.message);
+          e.preventDefault();
+          return false;
+        }
+      });
+      
+      window.addEventListener('unhandledrejection', function(e) {
+        if (e.reason && e.reason.toString().includes('rocket')) {
+          console.warn('Rocket promise rejection caught and suppressed:', e.reason);
+          e.preventDefault();
+          return false;
+        }
+      });
+    </script>
+    
+    <!-- Conditionally load Rocket script with error handling -->
+    <script>
+      (function() {
+        try {
+          var script = document.createElement('script');
+          script.type = 'module';
+          script.src = 'https://static.rocket.new/rocket-web.js?_cfg=https%3A%2F%2Fvoiced6833back.builtwithrocket.new&_be=https%3A%2F%2Fapplication.rocket.new&_v=0.1.5';
+          script.onerror = function() {
+            console.warn('Failed to load Rocket script, continuing without it');
+          };
+          document.head.appendChild(script);
+        } catch (e) {
+          console.warn('Error loading Rocket script:', e);
+        }
+      })();
+    </script>
 <script type="module" src="https://static.rocket.new/rocket-web.js?_cfg=https%3A%2F%2Fvoiced6833back.builtwithrocket.new&_be=https%3A%2F%2Fapplication.rocket.new&_v=0.1.5"></script>
 </head>
   <body>

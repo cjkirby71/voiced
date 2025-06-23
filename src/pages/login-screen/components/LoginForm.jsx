@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import Icon from 'components/AppIcon';
 import { useAuth } from '../../../context/AuthContext';
 
-const LoginForm = ({ isLoading: externalLoading }) => {
+const LoginForm = ({ isLoading: externalLoading, onSwitchToMagicLink }) => {
   const { signIn, authError, clearError } = useAuth();
   const [credentials, setCredentials] = useState({
     email: '',
@@ -165,6 +165,19 @@ const LoginForm = ({ isLoading: externalLoading }) => {
           </>
         )}
       </button>
+
+      {/* Magic Link Option */}
+      <div className="text-center">
+        <button
+          type="button"
+          onClick={onSwitchToMagicLink}
+          className="text-sm text-blue-600 hover:text-blue-700 underline transition-colors duration-200 flex items-center justify-center space-x-1"
+          disabled={loadingState}
+        >
+          <Icon name="Zap" size={16} />
+          <span>Sign in with magic link instead</span>
+        </button>
+      </div>
 
       {/* Demo Credentials Helper */}
       <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">

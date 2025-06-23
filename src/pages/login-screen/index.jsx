@@ -3,6 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import LoginForm from './components/LoginForm';
+import MagicLinkForm from './components/MagicLinkForm';
 import SocialAuthButtons from './components/SocialAuthButtons';
 import AppImage from '../../components/AppImage';
 
@@ -11,6 +12,7 @@ function LoginScreen() {
   const navigate = useNavigate();
   const location = useLocation();
   const [sessionMessage, setSessionMessage] = useState('');
+  const [authMode, setAuthMode] = useState('password'); // 'password' or 'magic-link'
 
   // Handle session expiration message
   useEffect(() => {
@@ -27,6 +29,14 @@ function LoginScreen() {
       navigate('/home-dashboard', { replace: true });
     }
   }, [user, loading, navigate]);
+
+  const switchToMagicLink = () => {
+    setAuthMode('magic-link');
+  };
+
+  const switchToPassword = () => {
+    setAuthMode('password');
+  };
 
   if (loading) {
     return (
@@ -67,10 +77,11 @@ function LoginScreen() {
           {/* Header */}
           <div className="text-center">
             <h2 className="text-3xl font-bold text-gray-900 mb-2">
-              Sign In
+              {authMode === 'magic-link' ? 'Magic Link Sign In' : 'Sign In'}
             </h2>
             <p className="text-gray-600">
-              Access your Voiced account to continue
+              {authMode === 'magic-link' ?'Get a secure link sent to your email' :'Access your Voiced account to continue'
+              }
             </p>
             
             {/* Session expiration message */}
@@ -86,21 +97,30 @@ function LoginScreen() {
             )}
           </div>
 
-          {/* Login Form */}
-          <LoginForm />
+          {/* Login Forms */}
+          {authMode === 'password' ? (
+            <LoginForm onSwitchToMagicLink={switchToMagicLink} />
+          ) : (
+            <MagicLinkForm onSwitchToLogin={switchToPassword} />
+          )}
 
-          {/* Separator */}
-          <div className="relative">
-            <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-gray-300" />
-            </div>
-            <div className="relative flex justify-center text-sm">
-              <span className="px-2 bg-white text-gray-500">Or continue with</span>
-            </div>
-          </div>
+          {/* Only show separator and social auth for password mode */}
+          {authMode === 'password' && (
+            <>
+              {/* Separator */}
+              <div className="relative">
+                <div className="absolute inset-0 flex items-center">
+                  <div className="w-full border-t border-gray-300" />
+                </div>
+                <div className="relative flex justify-center text-sm">
+                  <span className="px-2 bg-white text-gray-500">Or continue with</span>
+                </div>
+              </div>
 
-          {/* Social Auth */}
-          <SocialAuthButtons />
+              {/* Social Auth */}
+              <SocialAuthButtons />
+            </>
+          )}
 
           {/* Footer */}
           <div className="text-center space-y-2">
